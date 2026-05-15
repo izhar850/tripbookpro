@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { db } from "@/firebase";
 import { collection, query, where, onSnapshot, doc, deleteDoc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,7 +18,7 @@ import { getTransporterTripAISuggestions } from "@/ai/flows/transporter-trip-ai-
 import { cn } from "@/lib/utils";
 
 export default function Dashboard() {
-  const { profile } = useAuth();
+  const { profile, db } = useAuth();
   const { toast } = useToast();
   const [trips, setTrips] = useState<any[]>([]);
   const [parties, setParties] = useState<any[]>([]);
@@ -59,7 +58,7 @@ export default function Dashboard() {
   });
 
   useEffect(() => {
-    if (!profile) return;
+    if (!profile || !db) return;
 
     const tripsQuery = query(collection(db, "trips"), where("userId", "==", profile.uid));
     const unsubscribeTrips = onSnapshot(tripsQuery, (snapshot) => {
@@ -91,7 +90,7 @@ export default function Dashboard() {
       unsubscribeTrips();
       unsubscribeParties();
     };
-  }, [profile]);
+  }, [profile, db]);
 
   const calculateTotals = () => {
     const weight = Number(formData.weight) || 0;
@@ -145,7 +144,7 @@ export default function Dashboard() {
 
   const handleSaveTrip = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!profile) return;
+    if (!profile || !db) return;
 
     const selectedParty = parties.find(p => p.id === formData.partyId);
     if (!selectedParty) {
@@ -252,6 +251,7 @@ export default function Dashboard() {
   };
 
   const handleDeleteTrip = async (id: string) => {
+    if (!db) return;
     if (confirm("Are you sure you want to delete this trip record?")) {
       await deleteDoc(doc(db, "trips", id));
       toast({ title: "Deleted", description: "Trip record deleted successfully." });

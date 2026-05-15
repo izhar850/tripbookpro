@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { db } from "@/firebase";
+import { useFirestore } from "@/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Printer, ArrowLeft, Truck, Loader2 } from "lucide-react";
@@ -10,19 +10,20 @@ import { Printer, ArrowLeft, Truck, Loader2 } from "lucide-react";
 function LRReceiptContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const db = useFirestore();
   const id = searchParams.get("id");
   const [trip, setTrip] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!id) return;
+    if (!id || !db) return;
     const fetchTrip = async () => {
       const tripDoc = await getDoc(doc(db, "trips", id));
       if (tripDoc.exists()) setTrip(tripDoc.data());
       setLoading(false);
     };
     fetchTrip();
-  }, [id]);
+  }, [id, db]);
 
   if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>;
   if (!trip) return <div>Trip not found.</div>;
@@ -122,6 +123,7 @@ function LRReceiptContent() {
           </div>
         </div>
 
+        {/* Footer */}
         <div className="mt-8 flex justify-between items-end">
           <div className="text-center">
              <div className="w-40 h-1 border-b-2 border-dotted border-black mb-1" />
