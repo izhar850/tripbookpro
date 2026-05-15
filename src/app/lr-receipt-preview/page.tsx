@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useFirestore } from "@/firebase";
+import { useFirestore, useAuth as useFirebase } from "@/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Printer, ArrowLeft, Truck, Loader2 } from "lucide-react";
@@ -117,12 +117,27 @@ function LRReceiptContent() {
               <li>Not responsible for any leakage or damage during transit.</li>
               <li>Subject to local jurisdiction.</li>
             </ul>
-            <div className="mt-6 flex gap-4">
+            <div className="mt-6 flex flex-col gap-2">
               <span className="text-xs font-bold">GST PAYABLE BY:</span>
-              <div className="flex gap-2 text-xs uppercase font-bold">
-                 <span>[{trip.gstPayBy === 'consigner' ? '✓' : ' '}] Consignor</span>
-                 <span>[{trip.gstPayBy === 'consignee' ? '✓' : ' '}] Consignee</span>
-                 <span>[{trip.gstPayBy === 'transporter' ? '✓' : ' '}] Transporter</span>
+              <div className="flex gap-4 text-[10px] uppercase font-bold items-center">
+                 <div className="flex items-center gap-1">
+                    <div className="w-3.5 h-3.5 border border-black flex items-center justify-center bg-gray-50">
+                       {trip.gstPayBy === 'consigner' && <span>✓</span>}
+                    </div>
+                    <span>Consignor</span>
+                 </div>
+                 <div className="flex items-center gap-1">
+                    <div className="w-3.5 h-3.5 border border-black flex items-center justify-center bg-gray-50">
+                       {trip.gstPayBy === 'consignee' && <span>✓</span>}
+                    </div>
+                    <span>Consignee</span>
+                 </div>
+                 <div className="flex items-center gap-1">
+                    <div className="w-3.5 h-3.5 border border-black flex items-center justify-center bg-gray-50">
+                       {trip.gstPayBy === 'transporter' && <span>✓</span>}
+                    </div>
+                    <span>Transporter</span>
+                 </div>
               </div>
             </div>
           </div>
