@@ -1,9 +1,9 @@
 'use client';
 
 import { createContext, useContext, ReactNode } from 'react';
-import { FirebaseApp } from 'firebase/app';
-import { Firestore } from 'firebase/firestore';
-import { Auth } from 'firebase/auth';
+import { type FirebaseApp } from 'firebase/app';
+import { type Firestore } from 'firebase/firestore';
+import { type Auth } from 'firebase/auth';
 
 interface FirebaseContextType {
   app: FirebaseApp;
@@ -13,6 +13,9 @@ interface FirebaseContextType {
 
 const FirebaseContext = createContext<FirebaseContextType | undefined>(undefined);
 
+/**
+ * Provides Firebase service instances to the application via context.
+ */
 export function FirebaseProvider({
   children,
   app,
