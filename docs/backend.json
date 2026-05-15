@@ -1,0 +1,96 @@
+
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores transporter company details, bank info, and system role.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "companyName": { "type": "string" },
+        "ownerName": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["transporter", "admin"] },
+        "mobile": { "type": "string" },
+        "officePhone": { "type": "string" },
+        "gstNo": { "type": "string" },
+        "address": { "type": "string" },
+        "bankName": { "type": "string" },
+        "accountNo": { "type": "string" },
+        "ifscCode": { "type": "string" },
+        "profileCompleted": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Party": {
+      "title": "Party",
+      "description": "Client or Party for whom trips are being managed.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "partyName": { "type": "string" },
+        "gstNo": { "type": "string" },
+        "mobile": { "type": "string" },
+        "address": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "partyName"]
+    },
+    "Trip": {
+      "title": "Trip",
+      "description": "A logistics trip log containing freight and vehicle details.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "partyId": { "type": "string" },
+        "partyName": { "type": "string" },
+        "lrNo": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "vehicleNo": { "type": "string" },
+        "vehicleType": { "type": "string" },
+        "packages": { "type": "number" },
+        "weight": { "type": "number" },
+        "goodsDescription": { "type": "string" },
+        "source": { "type": "string" },
+        "destination": { "type": "string" },
+        "rateQtl": { "type": "number" },
+        "totalFreight": { "type": "number" },
+        "unloadingCharges": { "type": "number" },
+        "totalAmount": { "type": "number" },
+        "advance": { "type": "number" },
+        "balance": { "type": "number" },
+        "gstPayBy": { "type": "string", "enum": ["transporter", "consignee", "consigner"] },
+        "billed": { "type": "boolean" },
+        "billNo": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "partyId", "lrNo"]
+    }
+  },
+  "auth": {
+    "providers": ["password"]
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Transporter and Admin user profiles"
+    },
+    "/parties/{partyId}": {
+      "schema": { "$ref": "#/entities/Party" },
+      "description": "Clients registered by transporters"
+    },
+    "/trips/{tripId}": {
+      "schema": { "$ref": "#/entities/Trip" },
+      "description": "Trip logs and freight records"
+    },
+    "/counters/{userId}": {
+      "schema": { "type": "object", "properties": { "lastLrNo": { "type": "number" } } },
+      "description": "Sequential LR number tracking"
+    },
+    "/billCounters/{userId}": {
+      "schema": { "type": "object", "properties": { "lastBillNo": { "type": "number" } } },
+      "description": "Sequential Bill number tracking"
+    }
+  }
+}

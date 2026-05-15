@@ -1,9 +1,10 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
-import { auth, db } from '@/lib/firebase';
-import { onAuthStateChanged, User, signOut } from 'firebase/auth';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { useAuth as useFirebaseAuth, useFirestore, useUser } from '@/firebase';
+import { signOut } from 'firebase/auth';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
 
 export interface UserProfile {
@@ -24,40 +25,40 @@ export interface UserProfile {
 }
 
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(null);
+  const auth = useFirebaseAuth();
+  const db = useFirestore();
+  const { user, loading: userLoading } = useUser();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        setUser(firebaseUser);
-        
-        // Listen for profile changes in real-time
-        const profileRef = doc(db, 'users', firebaseUser.uid);
-        const unsubscribeProfile = onSnapshot(profileRef, (snapshot) => {
-          if (snapshot.exists()) {
-            setProfile({ ...snapshot.data(), uid: snapshot.id } as UserProfile);
-          }
-          setLoading(false);
-        });
+    if (userLoading) return;
 
-        return () => unsubscribeProfile();
-      } else {
-        setUser(null);
-        setProfile(null);
+    if (user && db) {
+      const profileRef = doc(db, 'users', user.uid);
+      const unsubscribeProfile = onSnapshot(profileRef, (snapshot) => {
+        if (snapshot.exists()) {
+          setProfile({ ...snapshot.data(), uid: snapshot.id } as UserProfile);
+        } else {
+          setProfile(null);
+        }
         setLoading(false);
-      }
-    });
+      });
 
-    return () => unsubscribeAuth();
-  }, []);
+      return () => unsubscribeProfile();
+    } else {
+      setProfile(null);
+      setLoading(false);
+    }
+  }, [user, userLoading, db]);
 
   const logout = async () => {
-    await signOut(auth);
-    router.push('/login');
+    if (auth) {
+      await signOut(auth);
+      router.push('/login');
+    }
   };
 
-  return { user, profile, loading, logout };
+  return { user, profile, loading: loading || userLoading, logout, auth, db };
 }
