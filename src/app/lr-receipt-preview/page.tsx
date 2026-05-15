@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
@@ -77,7 +78,7 @@ function LRReceiptContent() {
   if (!trip) return <div>Trip not found.</div>;
 
   const companyName = profile?.companyName || trip.companyName;
-  const companyAddress = profile?.address || trip.companyAddress || trip.source;
+  const companyAddress = profile?.address || trip.companyAddress;
   const companyGst = profile?.gstNo || trip.companyGst || "N/A";
   const companyMobile = profile?.mobile || trip.companyMobile || "N/A";
 
@@ -86,7 +87,6 @@ function LRReceiptContent() {
   return (
     <div className="min-h-screen bg-white text-black p-4 md:p-8 font-body">
       <div className="max-w-4xl mx-auto border-2 border-black p-6">
-        {/* Header */}
         <div className="flex justify-between items-start border-b-2 border-black pb-4 mb-4">
           <div className="flex gap-4">
              <Truck className="w-12 h-12" />
@@ -107,95 +107,83 @@ function LRReceiptContent() {
           </div>
         </div>
 
-        {/* Route Info */}
-        <div className="grid grid-cols-2 border-b-2 border-black mb-4 py-2 px-4 bg-gray-50">
+        <div className="grid grid-cols-2 border-b-2 border-black mb-4 py-2 px-4 bg-gray-50 font-bold">
            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold uppercase">FROM:</span>
-              <span className="font-bold text-lg">{trip.source}</span>
+              <span className="text-xs uppercase">FROM:</span>
+              <span>{trip.source}</span>
            </div>
            <div className="flex items-center gap-2 justify-end">
-              <span className="text-xs font-bold uppercase">TO:</span>
-              <span className="font-bold text-lg">{trip.destination}</span>
+              <span className="text-xs uppercase">TO:</span>
+              <span>{trip.destination}</span>
            </div>
         </div>
 
-        {/* Consignor/Consignee Section */}
         <div className="grid grid-cols-2 border-b-2 border-black mb-4">
           <div className="border-r-2 border-black p-4">
             <h3 className="text-xs font-bold uppercase mb-2">Consignor:</h3>
             <p className="font-bold">{companyName}</p>
-            <p className="text-sm whitespace-pre-wrap">Address: {companyAddress}</p>
+            <p className="text-sm">{companyAddress}</p>
             <p className="text-sm font-bold mt-2">GSTIN: {companyGst}</p>
           </div>
           <div className="p-4">
             <h3 className="text-xs font-bold uppercase mb-2">Consignee:</h3>
             <p className="font-bold">{trip.partyName}</p>
-            <p className="text-sm whitespace-pre-wrap">{trip.partyAddress}</p>
+            <p className="text-sm">{trip.partyAddress}</p>
             <p className="text-sm font-bold mt-2">GSTIN: {trip.partyGst || 'UNREGISTERED'}</p>
           </div>
         </div>
 
-        {/* Cargo Details */}
         <div className="mb-4">
           <table className="w-full border-2 border-black">
             <thead>
-              <tr className="bg-gray-100 border-b-2 border-black">
-                <th className="border-r-2 border-black p-2 text-[10px]">PKGS</th>
-                <th className="border-r-2 border-black p-2 text-[10px]">DESCRIPTION OF GOODS</th>
-                <th className="border-r-2 border-black p-2 text-[10px]">VEHICLE SIZE (LxWxH)</th>
-                <th className="border-r-2 border-black p-2 text-[10px]">WEIGHT (QTL)</th>
-                <th className="border-r-2 border-black p-2 text-[10px]">VEHICLE NO</th>
-                <th className="p-2 text-[10px]">RATE/QTL</th>
+              <tr className="bg-gray-100 border-b-2 border-black text-[10px]">
+                <th className="border-r-2 border-black p-2">PKGS</th>
+                <th className="border-r-2 border-black p-2">DESCRIPTION OF GOODS</th>
+                <th className="border-r-2 border-black p-2">VEHICLE SIZE</th>
+                <th className="border-r-2 border-black p-2">WEIGHT (QTL)</th>
+                <th className="border-r-2 border-black p-2">VEHICLE NO</th>
+                <th className="p-2">RATE/QTL</th>
               </tr>
             </thead>
-            <tbody>
-              <tr className="border-b-2 border-black h-32 align-top">
+            <tbody className="h-32 align-top text-xs">
+              <tr className="border-b-2 border-black">
                 <td className="border-r-2 border-black p-4 text-center font-bold">{trip.packages}</td>
-                <td className="border-r-2 border-black p-4 font-medium uppercase">{trip.goodsDescription}</td>
-                <td className="border-r-2 border-black p-4 text-center text-xs">
-                  {trip.sizeL || '-'} x {trip.sizeW || '-'} x {trip.sizeH || '-'} ft
+                <td className="border-r-2 border-black p-4 uppercase">{trip.goodsDescription}</td>
+                <td className="border-r-2 border-black p-4 text-center">
+                  {trip.sizeL || '-'}x{trip.sizeW || '-'}x{trip.sizeH || '-'} ft
                 </td>
                 <td className="border-r-2 border-black p-4 text-center font-bold">{Number(trip.weight || 0)}</td>
-                <td className="border-r-2 border-black p-4 text-center font-bold font-mono">{trip.vehicleNo}</td>
+                <td className="border-r-2 border-black p-4 text-center font-bold">{trip.vehicleNo}</td>
                 <td className="p-4 text-right font-bold">₹{Number(trip.rateQtl || 0).toFixed(2)}</td>
               </tr>
             </tbody>
           </table>
         </div>
 
-        {/* Summary and Terms */}
         <div className="grid grid-cols-3 gap-4">
-          <div className="col-span-2 border-2 border-black p-4 h-full relative">
-            <h4 className="text-xs font-bold underline mb-2">TERMS & CONDITIONS</h4>
-            <ul className="text-[10px] space-y-1 list-disc pl-3">
-              <li>Goods are carried at Owner's Risk.</li>
-              <li>Consignee should check the goods at the time of delivery.</li>
-              <li>Not responsible for any leakage or damage during transit.</li>
-              <li>Subject to local jurisdiction.</li>
-            </ul>
-            
-            <div className="mt-4 p-2 bg-gray-50 border border-black/10 rounded">
-               <span className="text-[10px] font-bold block mb-1">AMOUNT IN WORDS:</span>
+          <div className="col-span-2 border-2 border-black p-4">
+            <div className="p-2 bg-gray-50 border border-black/10 rounded mb-4">
+               <span className="text-[10px] font-bold block mb-1 underline">AMOUNT IN WORDS:</span>
                <p className="text-xs font-bold uppercase italic">Rupees {numberToWords(totalAmount)} Only</p>
             </div>
 
-            <div className="mt-4 flex flex-col gap-2">
-              <span className="text-xs font-bold">GST PAYABLE BY:</span>
-              <div className="flex gap-4 text-[10px] uppercase font-bold items-center">
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-bold underline">GST PAYABLE BY:</span>
+              <div className="flex gap-4 text-[10px] uppercase font-bold">
                  <div className="flex items-center gap-1">
-                    <div className="w-4 h-4 border border-black flex items-center justify-center bg-gray-50">
+                    <div className="w-4 h-4 border border-black flex items-center justify-center">
                        {trip.gstPayBy === 'consigner' && <span>✓</span>}
                     </div>
                     <span>Consignor</span>
                  </div>
                  <div className="flex items-center gap-1">
-                    <div className="w-4 h-4 border border-black flex items-center justify-center bg-gray-50">
+                    <div className="w-4 h-4 border border-black flex items-center justify-center">
                        {trip.gstPayBy === 'consignee' && <span>✓</span>}
                     </div>
                     <span>Consignee</span>
                  </div>
                  <div className="flex items-center gap-1">
-                    <div className="w-4 h-4 border border-black flex items-center justify-center bg-gray-50">
+                    <div className="w-4 h-4 border border-black flex items-center justify-center">
                        {trip.gstPayBy === 'transporter' && <span>✓</span>}
                     </div>
                     <span>Transporter</span>
@@ -203,46 +191,41 @@ function LRReceiptContent() {
               </div>
             </div>
           </div>
-          <div className="border-2 border-black p-0 divide-y-2 divide-black">
+          <div className="border-2 border-black divide-y-2 divide-black text-xs">
              <div className="p-2 flex justify-between">
-                <span className="text-xs font-bold">TOTAL FREIGHT:</span>
+                <span>TOTAL FREIGHT:</span>
                 <span className="font-bold">₹{Number(trip.totalFreight || 0).toFixed(2)}</span>
              </div>
              <div className="p-2 flex justify-between">
-                <span className="text-xs font-bold">UNLOADING:</span>
+                <span>UNLOADING:</span>
                 <span className="font-bold">₹{Number(trip.unloadingCharges || 0).toFixed(2)}</span>
              </div>
-             <div className="p-2 flex justify-between">
-                <span className="text-xs font-bold">ADVANCE PAID:</span>
-                <span className="font-bold">₹{Number(trip.advance || 0).toFixed(2)}</span>
-             </div>
-             <div className="p-2 flex justify-between bg-gray-100">
-                <span className="text-xs font-bold">BALANCE DUE:</span>
-                <span className="font-bold text-lg">₹{Number(trip.balance || 0).toFixed(2)}</span>
+             <div className="p-2 flex justify-between bg-gray-100 font-bold">
+                <span>BALANCE DUE:</span>
+                <span className="text-sm">₹{Number(trip.balance || 0).toFixed(2)}</span>
              </div>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="mt-8 flex justify-between items-end">
+        <div className="mt-8 flex justify-between items-end text-[10px] font-bold uppercase">
           <div className="text-center">
-             <div className="w-40 h-1 border-b-2 border-dotted border-black mb-1" />
-             <p className="text-[10px] font-bold uppercase">Consignee Signature</p>
+             <div className="w-40 border-b border-black mb-1" />
+             <p>Consignee Signature</p>
           </div>
-          <div className="text-right text-xs">
-             <p className="font-bold uppercase">For {companyName}</p>
-             <div className="h-16" />
-             <p className="font-bold uppercase border-t border-black pt-1">Authorized Signatory</p>
+          <div className="text-right">
+             <p>For {companyName}</p>
+             <div className="h-12" />
+             <p className="border-t border-black pt-1">Authorized Signatory</p>
           </div>
         </div>
       </div>
 
       <div className="fixed bottom-8 left-1/2 -translate-x-1/2 flex gap-4 no-print">
-         <Button variant="outline" onClick={() => router.back()} className="bg-white border-black text-black hover:bg-gray-100 font-bold h-12 shadow-xl">
+         <Button variant="outline" onClick={() => router.back()} className="bg-white border-black text-black font-bold h-12 shadow-xl">
             <ArrowLeft className="w-5 h-5 mr-2" /> Back
          </Button>
-         <Button onClick={() => window.print()} className="bg-black text-white hover:bg-gray-800 font-bold h-12 shadow-xl">
-            <Printer className="w-5 h-5 mr-2" /> Print LR Receipt
+         <Button onClick={() => window.print()} className="bg-black text-white font-bold h-12 shadow-xl">
+            <Printer className="w-5 h-5 mr-2" /> Print LR
          </Button>
       </div>
     </div>

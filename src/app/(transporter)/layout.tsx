@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useAuth } from "@/hooks/use-auth";
@@ -12,13 +13,32 @@ import {
   SidebarMenu, 
   SidebarMenuItem, 
   SidebarMenuButton,
-  SidebarTrigger
+  SidebarTrigger,
+  useSidebar
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Loader2, LayoutDashboard, Users, CreditCard, User, LogOut, Truck, Menu } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+
+function MobileHeader() {
+  const { toggleSidebar } = useSidebar();
+  
+  return (
+    <header className="flex md:hidden items-center justify-between p-4 border-b border-border/50 bg-card/80 backdrop-blur-md sticky top-0 z-20">
+      <div className="flex items-center gap-2">
+        <div className="w-8 h-8 bg-gradient-primary rounded flex items-center justify-center">
+          <Truck className="text-white w-4 h-4" />
+        </div>
+        <span className="font-headline font-bold text-sm tracking-tight">TripBook Pro</span>
+      </div>
+      <Button size="icon" variant="ghost" className="h-9 w-9" onClick={toggleSidebar}>
+        <Menu className="h-5 w-5" />
+      </Button>
+    </header>
+  );
+}
 
 export default function TransporterLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading, logout } = useAuth();
@@ -65,7 +85,7 @@ export default function TransporterLayout({ children }: { children: React.ReactN
             <SidebarMenu>
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.name}>
-                  <Link href={item.href} passHref>
+                  <Link href={item.href} passHref legacyBehavior>
                     <SidebarMenuButton 
                       isActive={pathname === item.href}
                       className={cn(
@@ -104,21 +124,7 @@ export default function TransporterLayout({ children }: { children: React.ReactN
         </Sidebar>
 
         <main className="flex-1 min-w-0 flex flex-col h-screen overflow-hidden">
-          {/* Mobile Header with Sidebar Trigger */}
-          <header className="flex md:hidden items-center justify-between p-4 border-b border-border/50 bg-card/80 backdrop-blur-md sticky top-0 z-20">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-gradient-primary rounded flex items-center justify-center">
-                <Truck className="text-white w-4 h-4" />
-              </div>
-              <span className="font-headline font-bold text-sm tracking-tight">TripBook Pro</span>
-            </div>
-            <SidebarTrigger asChild>
-              <Button size="icon" variant="ghost" className="h-9 w-9">
-                <Menu className="h-5 w-5" />
-              </Button>
-            </SidebarTrigger>
-          </header>
-
+          <MobileHeader />
           <div className="flex-1 overflow-y-auto scrollbar-hide">
             <div className="max-w-7xl mx-auto p-4 md:p-8">
               {children}
