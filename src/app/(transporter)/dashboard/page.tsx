@@ -13,6 +13,16 @@ import { AlertCircle, Plus, Edit, Trash2, FileText, ChevronRight, Loader2, Spark
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle 
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { getTransporterTripAISuggestions } from "@/ai/flows/transporter-trip-ai-suggestions";
@@ -26,6 +36,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [editingTrip, setEditingTrip] = useState<any>(null);
+  const [tripToDelete, setTripToDelete] = useState<any>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -256,11 +267,15 @@ export default function Dashboard() {
     });
   };
 
-  const handleDeleteTrip = async (id: string) => {
-    if (!db) return;
-    if (confirm("Are you sure you want to delete this trip record?")) {
-      await deleteDoc(doc(db, "trips", id));
-      toast({ title: "Deleted", description: "Trip record deleted successfully." });
+  const handleDeleteTrip = async () => {
+    if (!db || !tripToDelete) return;
+    try {
+      await deleteDoc(doc(db, "trips", tripToDelete.id));
+      toast({ title: "Deleted", description: `Trip ${tripToDelete.lrNo} record deleted successfully.` });
+    } catch (error: any) {
+      toast({ title: "Error Deleting", description: error.message, variant: "destructive" });
+    } finally {
+      setTripToDelete(null);
     }
   };
 
@@ -291,15 +306,15 @@ export default function Dashboard() {
   };
 
   const filteredTrips = trips.filter(trip => {
-    const query = searchQuery.toLowerCase();
+    const queryStr = searchQuery.toLowerCase();
     return (
-      trip.lrNo?.toLowerCase().includes(query) ||
-      trip.partyName?.toLowerCase().includes(query) ||
-      trip.vehicleNo?.toLowerCase().includes(query) ||
-      trip.source?.toLowerCase().includes(query) ||
-      trip.destination?.toLowerCase().includes(query) ||
-      trip.goodsDescription?.toLowerCase().includes(query) ||
-      trip.date?.toLowerCase().includes(query)
+      trip.lrNo?.toLowerCase().includes(queryStr) ||
+      trip.partyName?.toLowerCase().includes(queryStr) ||
+      trip.vehicleNo?.toLowerCase().includes(queryStr) ||
+      trip.source?.toLowerCase().includes(queryStr) ||
+      trip.destination?.toLowerCase().includes(queryStr) ||
+      trip.goodsDescription?.toLowerCase().includes(queryStr) ||
+      trip.date?.toLowerCase().includes(queryStr)
     );
   });
 
@@ -593,7 +608,7 @@ export default function Dashboard() {
                         <Button size="icon" variant="ghost" onClick={() => handleEditTrip(trip)} className="text-blue-500 hover:bg-blue-500/10">
                           <Edit className="w-4 h-4" />
                         </Button>
-                        <Button size="icon" variant="ghost" onClick={() => handleDeleteTrip(trip.id)} className="text-destructive hover:bg-destructive/10">
+                        <Button size="icon" variant="ghost" onClick={() => setTripToDelete(trip)} className="text-destructive hover:bg-destructive/10">
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
@@ -605,6 +620,30 @@ export default function Dashboard() {
           )}
         </CardContent>
       </Card>
+
+      {/* Stylish Delete Confirmation Alert */}
+      <AlertDialog open={!!tripToDelete} onOpenChange={(open) => !open && setTripToDelete(null)}>
+        <AlertDialogContent className="bg-card border border-border/50">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-2xl font-headline font-bold text-destructive flex items-center gap-2">
+              <Trash2 className="w-6 h-6" /> Confirm Deletion
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground pt-2">
+              Are you sure you want to permanently delete trip <span className="font-bold text-foreground">{tripToDelete?.lrNo}</span>? 
+              This action cannot be undone and will remove all freight records for this shipment.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="pt-4">
+            <AlertDialogCancel className="bg-secondary hover:bg-secondary/80 border-none font-bold">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteTrip}
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground font-bold shadow-lg shadow-destructive/20"
+            >
+              Delete Shipment
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
