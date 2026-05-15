@@ -1,20 +1,22 @@
 
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, Suspense, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
-import { Printer, ArrowLeft, Loader2 } from "lucide-react";
+import { Printer, ArrowLeft, Loader2, FileDown } from "lucide-react";
 
 function InvoiceContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const invoiceId = searchParams.get("id");
+  const invoiceRef = useRef<HTMLDivElement>(null);
   
   const [invoice, setInvoice] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -37,14 +39,39 @@ function InvoiceContent() {
     fetchData();
   }, [invoiceId]);
 
+  const handleDownloadPdf = async () => {
+    if (!invoiceRef.current || !invoice) return;
+    setDownloading(true);
+    
+    // Import html2pdf dynamically on the client side
+    const html2pdf = (await import('html2pdf.js')).default;
+    
+    const element = invoiceRef.current;
+    const opt = {
+      margin: 10,
+      filename: `${invoice.billNo || 'Invoice'}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, logging: false },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    try {
+      await html2pdf().from(element).set(opt).save();
+    } catch (error) {
+      console.error("PDF generation failed:", error);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>;
-  if (!invoice) return <div className="p-8 text-center">Invoice data not found. <Button variant="link" onClick={() => router.back()}>Go Back</Button></div>;
+  if (!invoice) return <div className="p-8 text-center text-foreground">Invoice data not found. <Button variant="link" onClick={() => router.back()}>Go Back</Button></div>;
 
   const { transporterProfile: profile, trips, billNo, partyName, partyAddress, partyGst, partyMobile, invoiceTotal } = invoice;
 
   return (
-    <div className="min-h-screen bg-white text-black p-4 md:p-8 font-body">
-      <div className="max-w-5xl mx-auto border-2 border-black p-8">
+    <div className="min-h-screen bg-slate-900 text-black p-4 md:p-8 font-body">
+      <div ref={invoiceRef} className="max-w-5xl mx-auto bg-white border-2 border-black p-8 shadow-2xl">
         {/* Header */}
         <div className="flex justify-between mb-8 border-b-4 border-black pb-6">
            <div>
@@ -108,7 +135,6 @@ function InvoiceContent() {
                     <td className="p-2 text-right font-bold">₹{Number(trip.totalAmount || 0).toFixed(2)}</td>
                  </tr>
               ))}
-              {/* Fill remaining space */}
               <tr className="h-40 align-top">
                  <td colSpan={9} className="p-2"></td>
               </tr>
@@ -142,6 +168,10 @@ function InvoiceContent() {
       <div className="fixed bottom-8 left-1/2 -translate-x-1/2 flex gap-4 no-print">
          <Button variant="outline" onClick={() => router.back()} className="bg-white border-black text-black hover:bg-gray-100 font-bold h-12 shadow-xl">
             <ArrowLeft className="w-5 h-5 mr-2" /> Back
+         </Button>
+         <Button onClick={handleDownloadPdf} disabled={downloading} className="bg-primary text-white hover:opacity-90 font-bold h-12 shadow-xl">
+            {downloading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <FileDown className="w-5 h-5 mr-2" />}
+            Download PDF
          </Button>
          <Button onClick={() => window.print()} className="bg-black text-white hover:bg-gray-800 font-bold h-12 shadow-xl">
             <Printer className="w-5 h-5 mr-2" /> Print Invoice

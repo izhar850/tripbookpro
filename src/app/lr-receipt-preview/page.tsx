@@ -1,12 +1,12 @@
 
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, Suspense, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useFirestore } from "@/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
-import { Printer, ArrowLeft, Truck, Loader2 } from "lucide-react";
+import { Printer, ArrowLeft, Truck, Loader2, FileDown } from "lucide-react";
 
 // Helper for number to words (Indian System)
 function numberToWords(num: number): string {
@@ -52,9 +52,12 @@ function LRReceiptContent() {
   const router = useRouter();
   const db = useFirestore();
   const id = searchParams.get("id");
+  const receiptRef = useRef<HTMLDivElement>(null);
+
   const [trip, setTrip] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     if (!id || !db) return;
@@ -74,6 +77,31 @@ function LRReceiptContent() {
     fetchData();
   }, [id, db]);
 
+  const handleDownloadPdf = async () => {
+    if (!receiptRef.current || !trip) return;
+    setDownloading(true);
+    
+    // Import html2pdf dynamically
+    const html2pdf = (await import('html2pdf.js')).default;
+    
+    const element = receiptRef.current;
+    const opt = {
+      margin: 10,
+      filename: `${trip.lrNo || 'LR'}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, logging: false },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    try {
+      await html2pdf().from(element).set(opt).save();
+    } catch (error) {
+      console.error("PDF generation failed:", error);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>;
   if (!trip) return <div>Trip not found.</div>;
 
@@ -85,8 +113,8 @@ function LRReceiptContent() {
   const totalAmount = Number(trip.totalAmount || 0);
 
   return (
-    <div className="min-h-screen bg-white text-black p-4 md:p-8 font-body">
-      <div className="max-w-4xl mx-auto border-2 border-black p-6">
+    <div className="min-h-screen bg-slate-900 text-black p-4 md:p-8 font-body">
+      <div ref={receiptRef} className="max-w-4xl mx-auto bg-white border-2 border-black p-6 shadow-2xl">
         <div className="flex justify-between items-start border-b-2 border-black pb-4 mb-4">
           <div className="flex gap-4">
              <Truck className="w-12 h-12" />
@@ -223,6 +251,10 @@ function LRReceiptContent() {
       <div className="fixed bottom-8 left-1/2 -translate-x-1/2 flex gap-4 no-print">
          <Button variant="outline" onClick={() => router.back()} className="bg-white border-black text-black font-bold h-12 shadow-xl">
             <ArrowLeft className="w-5 h-5 mr-2" /> Back
+         </Button>
+         <Button onClick={handleDownloadPdf} disabled={downloading} className="bg-primary text-white hover:opacity-90 font-bold h-12 shadow-xl">
+            {downloading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <FileDown className="w-5 h-5 mr-2" />}
+            Download PDF
          </Button>
          <Button onClick={() => window.print()} className="bg-black text-white font-bold h-12 shadow-xl">
             <Printer className="w-5 h-5 mr-2" /> Print LR
