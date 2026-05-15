@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, doc, runTransaction } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -66,8 +66,13 @@ export default function BillingPage() {
     if (!profile || selectedTripIds.length === 0) return;
     setGenerating(true);
 
+    const party = parties.find(p => p.id === selectedPartyId);
+    if (!party) return;
+
     try {
       let billNo = "";
+      let invoiceId = "";
+
       await runTransaction(db, async (transaction) => {
         const counterRef = doc(db, "billCounters", profile.uid);
         const counterDoc = await transaction.get(counterRef);
@@ -79,22 +84,49 @@ export default function BillingPage() {
 
         billNo = `BILL-${nextBillNo.toString().padStart(4, '0')}`;
         
+        // Create permanent invoice document
+        const invoiceRef = doc(collection(db, "invoices"));
+        invoiceId = invoiceRef.id;
+
+        transaction.set(invoiceRef, {
+          userId: profile.uid,
+          billNo,
+          partyId: selectedPartyId,
+          partyName: party.partyName,
+          partyGst: party.gstNo || "",
+          partyAddress: party.address || "",
+          partyMobile: party.mobile || "",
+          invoiceTotal,
+          trips: selectedTrips,
+          transporterProfile: {
+            companyName: profile.companyName,
+            address: profile.address,
+            gstNo: profile.gstNo,
+            email: profile.email,
+            mobile: profile.mobile,
+            officePhone: profile.officePhone,
+            bankName: profile.bankName,
+            accountNo: profile.accountNo,
+            ifscCode: profile.ifscCode
+          },
+          createdAt: serverTimestamp()
+        });
+
         // Mark trips as billed
         selectedTripIds.forEach(id => {
           const tripRef = doc(db, "trips", id);
-          transaction.update(tripRef, { billed: true, billNo });
+          transaction.update(tripRef, { 
+            billed: true, 
+            billNo, 
+            invoiceId 
+          });
         });
 
         transaction.update(counterRef, { lastBillNo: nextBillNo });
       });
 
-      const queryParams = new URLSearchParams({
-        billNo,
-        partyId: selectedPartyId,
-        tripIds: selectedTripIds.join(',')
-      });
-
-      router.push(`/invoice-preview?${queryParams.toString()}`);
+      toast({ title: "Success", description: `Invoice ${billNo} generated.` });
+      router.push(`/invoice-preview?id=${invoiceId}`);
     } catch (error: any) {
       toast({ title: "Billing Error", description: error.message, variant: "destructive" });
     } finally {

@@ -1,51 +1,46 @@
+
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
-import { Printer, ArrowLeft, Truck, Loader2 } from "lucide-react";
+import { Printer, ArrowLeft, Loader2 } from "lucide-react";
 
 function InvoiceContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const billNo = searchParams.get("billNo");
-  const partyId = searchParams.get("partyId");
-  const tripIds = searchParams.get("tripIds")?.split(',') || [];
+  const invoiceId = searchParams.get("id");
   
-  const [party, setParty] = useState<any>(null);
-  const [profile, setProfile] = useState<any>(null);
-  const [trips, setTrips] = useState<any[]>([]);
+  const [invoice, setInvoice] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!partyId) return;
-      
-      const partyDoc = await getDoc(doc(db, "parties", partyId));
-      if (partyDoc.exists()) {
-        const pData = partyDoc.data();
-        setParty(pData);
-        
-        // Use party's owner ID to fetch transporter profile
-        const userDoc = await getDoc(doc(db, "users", pData.userId));
-        if (userDoc.exists()) setProfile(userDoc.data());
+      if (!invoiceId) {
+        setLoading(false);
+        return;
       }
-
-      const tripPromises = tripIds.map(id => getDoc(doc(db, "trips", id)));
-      const tripDocs = await Promise.all(tripPromises);
-      setTrips(tripDocs.filter(d => d.exists()).map(d => d.data()));
       
-      setLoading(false);
+      try {
+        const invoiceDoc = await getDoc(doc(db, "invoices", invoiceId));
+        if (invoiceDoc.exists()) {
+          setInvoice(invoiceDoc.data());
+        }
+      } catch (error) {
+        console.error("Error fetching invoice:", error);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchData();
-  }, [partyId, tripIds]);
+  }, [invoiceId]);
 
   if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>;
-  if (!party || !profile) return <div>Data not found.</div>;
+  if (!invoice) return <div className="p-8 text-center">Invoice data not found. <Button variant="link" onClick={() => router.back()}>Go Back</Button></div>;
 
-  const totalAmount = trips.reduce((acc, t) => acc + (Number(t.totalAmount) || 0), 0);
+  const { transporterProfile: profile, trips, billNo, partyName, partyAddress, partyGst, partyMobile, invoiceTotal } = invoice;
 
   return (
     <div className="min-h-screen bg-white text-black p-4 md:p-8 font-body">
@@ -65,7 +60,7 @@ function InvoiceContent() {
            <div className="text-right flex flex-col justify-center">
               <h2 className="text-3xl font-bold border-b-2 border-black inline-block ml-auto mb-4">TAX INVOICE</h2>
               <p className="text-lg font-bold">Bill No: {billNo}</p>
-              <p className="text-md">Date: {new Date().toLocaleDateString()}</p>
+              <p className="text-md">Date: {new Date(invoice.createdAt?.seconds * 1000).toLocaleDateString()}</p>
            </div>
         </div>
 
@@ -74,12 +69,12 @@ function InvoiceContent() {
            <h3 className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-widest">Billing To:</h3>
            <div className="grid grid-cols-2">
               <div>
-                 <p className="text-xl font-bold uppercase">{party.partyName}</p>
-                 <p className="text-sm max-w-md">{party.address}</p>
+                 <p className="text-xl font-bold uppercase">{partyName}</p>
+                 <p className="text-sm max-w-md">{partyAddress}</p>
               </div>
               <div className="text-right">
-                 <p><span className="font-bold">GST No:</span> {party.gstNo || 'UNREGISTERED'}</p>
-                 <p><span className="font-bold">Mobile:</span> {party.mobile || 'N/A'}</p>
+                 <p><span className="font-bold">GST No:</span> {partyGst || 'UNREGISTERED'}</p>
+                 <p><span className="font-bold">Mobile:</span> {partyMobile || 'N/A'}</p>
               </div>
            </div>
         </div>
@@ -100,7 +95,7 @@ function InvoiceContent() {
               </tr>
            </thead>
            <tbody className="divide-y divide-black/10">
-              {trips.map((trip, idx) => (
+              {trips.map((trip: any, idx: number) => (
                  <tr key={idx} className="text-sm">
                     <td className="p-2 border-r border-black/10 text-center">{trip.date}</td>
                     <td className="p-2 border-r border-black/10 font-bold">{trip.lrNo}</td>
@@ -113,7 +108,7 @@ function InvoiceContent() {
                     <td className="p-2 text-right font-bold">₹{Number(trip.totalAmount || 0).toFixed(2)}</td>
                  </tr>
               ))}
-              {/* Fill remaining space if needed */}
+              {/* Fill remaining space */}
               <tr className="h-40 align-top">
                  <td colSpan={9} className="p-2"></td>
               </tr>
@@ -121,7 +116,7 @@ function InvoiceContent() {
            <tfoot>
               <tr className="bg-gray-100 border-t-2 border-black">
                  <td colSpan={8} className="p-3 text-right font-bold text-lg">GRAND TOTAL</td>
-                 <td className="p-3 text-right font-bold text-xl">₹{totalAmount.toLocaleString()}</td>
+                 <td className="p-3 text-right font-bold text-xl">₹{invoiceTotal.toLocaleString()}</td>
               </tr>
            </tfoot>
         </table>
@@ -134,7 +129,7 @@ function InvoiceContent() {
               <p className="text-sm"><span className="font-bold">A/C No:</span> {profile.accountNo}</p>
               <p className="text-sm"><span className="font-bold">IFSC Code:</span> {profile.ifscCode}</p>
               <div className="mt-4 pt-4 border-t border-black">
-                 <p className="text-xs font-bold uppercase italic">Amount in words: Rupees {totalAmount.toLocaleString()} Only</p>
+                 <p className="text-xs font-bold uppercase italic">Amount in words: Rupees {invoiceTotal.toLocaleString()} Only</p>
               </div>
            </div>
            <div className="text-right flex flex-col justify-end items-end p-4">

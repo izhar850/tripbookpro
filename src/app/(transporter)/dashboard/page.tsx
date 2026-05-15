@@ -3,13 +3,12 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { useFirestore } from "@/firebase";
 import { collection, query, where, onSnapshot, doc, deleteDoc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
-import { AlertCircle, Plus, Edit, Trash2, FileText, Loader2, Sparkles, Search, TrendingUp, Users as UsersIcon, Wallet, ArrowUpRight, Truck, Tag } from "lucide-react";
+import { Plus, Edit, Trash2, FileText, Loader2, Sparkles, Search, TrendingUp, Users as UsersIcon, Wallet, ArrowUpRight, Truck, Receipt } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -658,14 +657,25 @@ export default function Dashboard() {
                               <FileText className="w-4 h-4" />
                             </Button>
                           </Link>
-                          {!trip.billed && (
-                            <Button size="icon" variant="ghost" onClick={() => handleEditTrip(trip)} className="h-8 w-8 text-blue-500" title="Edit">
-                              <Edit className="w-4 h-4" />
-                            </Button>
+                          
+                          {trip.billed && trip.invoiceId && (
+                            <Link href={`/invoice-preview?id=${trip.invoiceId}`}>
+                              <Button size="icon" variant="ghost" className="h-8 w-8 text-accent" title="View Bill">
+                                <Receipt className="w-4 h-4" />
+                              </Button>
+                            </Link>
                           )}
-                          <Button size="icon" variant="ghost" onClick={() => setTripToDelete(trip)} className="h-8 w-8 text-destructive" title="Delete">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+
+                          {!trip.billed && (
+                            <>
+                              <Button size="icon" variant="ghost" onClick={() => handleEditTrip(trip)} className="h-8 w-8 text-blue-500" title="Edit">
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button size="icon" variant="ghost" onClick={() => setTripToDelete(trip)} className="h-8 w-8 text-destructive" title="Delete">
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

@@ -46,6 +46,9 @@
         "partyId": { "type": "string" },
         "partyName": { "type": "string" },
         "lrNo": { "type": "string" },
+        "billNo": { "type": "string" },
+        "billed": { "type": "boolean" },
+        "invoiceId": { "type": "string" },
         "date": { "type": "string", "format": "date" },
         "vehicleNo": { "type": "string" },
         "vehicleType": { "type": "string" },
@@ -54,18 +57,30 @@
         "goodsDescription": { "type": "string" },
         "source": { "type": "string" },
         "destination": { "type": "string" },
-        "rateQtl": { "type": "number" },
-        "totalFreight": { "type": "number" },
-        "unloadingCharges": { "type": "number" },
         "totalAmount": { "type": "number" },
-        "advance": { "type": "number" },
         "balance": { "type": "number" },
-        "gstPayBy": { "type": "string", "enum": ["transporter", "consignee", "consigner"] },
-        "billed": { "type": "boolean" },
-        "billNo": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "partyId", "lrNo"]
+    },
+    "Invoice": {
+      "title": "Invoice",
+      "description": "A permanent tax invoice record containing multiple trip details.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "billNo": { "type": "string" },
+        "partyId": { "type": "string" },
+        "partyName": { "type": "string" },
+        "partyGst": { "type": "string" },
+        "partyAddress": { "type": "string" },
+        "partyMobile": { "type": "string" },
+        "invoiceTotal": { "type": "number" },
+        "trips": { "type": "array", "items": { "type": "object" } },
+        "transporterProfile": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "billNo", "partyId"]
     }
   },
   "auth": {
@@ -83,6 +98,10 @@
     "/trips/{tripId}": {
       "schema": { "$ref": "#/entities/Trip" },
       "description": "Trip logs and freight records"
+    },
+    "/invoices/{invoiceId}": {
+      "schema": { "$ref": "#/entities/Invoice" },
+      "description": "Permanent tax invoices generated for parties"
     },
     "/counters/{userId}": {
       "schema": { "type": "object", "properties": { "lastLrNo": { "type": "number" } } },
