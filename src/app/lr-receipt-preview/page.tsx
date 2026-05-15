@@ -38,7 +38,7 @@ function LRReceiptContent() {
              <div>
                 <h1 className="text-3xl font-bold uppercase">{trip.companyName}</h1>
                 <p className="text-sm font-bold">Logistics & Transportation Services</p>
-                <p className="text-xs">{trip.companyAddress || trip.source}</p>
+                <p className="text-xs whitespace-pre-wrap max-w-sm">{trip.companyAddress || trip.source}</p>
                 <p className="text-xs font-bold mt-1">GSTIN: {trip.partyGst || 'N/A'}</p>
              </div>
           </div>
@@ -54,12 +54,12 @@ function LRReceiptContent() {
           <div className="border-r-2 border-black p-4">
             <h3 className="text-xs font-bold uppercase mb-2">Consignor:</h3>
             <p className="font-bold">{trip.companyName}</p>
-            <p className="text-sm">Address: {trip.companyAddress || trip.source}</p>
+            <p className="text-sm whitespace-pre-wrap">Address: {trip.companyAddress || trip.source}</p>
           </div>
           <div className="p-4">
             <h3 className="text-xs font-bold uppercase mb-2">Consignee:</h3>
             <p className="font-bold">{trip.partyName}</p>
-            <p className="text-sm">{trip.partyAddress}</p>
+            <p className="text-sm whitespace-pre-wrap">{trip.partyAddress}</p>
             <p className="text-sm font-bold mt-2">GST: {trip.partyGst}</p>
           </div>
         </div>

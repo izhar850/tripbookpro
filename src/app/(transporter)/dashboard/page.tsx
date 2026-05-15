@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { useFirestore } from "@/firebase";
 import { collection, query, where, onSnapshot, doc, deleteDoc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,8 @@ import { getTransporterTripAISuggestions } from "@/ai/flows/transporter-trip-ai-
 import { cn } from "@/lib/utils";
 
 export default function Dashboard() {
-  const { profile, db } = useAuth();
+  const { profile } = useAuth();
+  const db = useFirestore();
   const { toast } = useToast();
   const [trips, setTrips] = useState<any[]>([]);
   const [parties, setParties] = useState<any[]>([]);
@@ -170,7 +172,7 @@ export default function Dashboard() {
             ...formData,
             ...numericData,
             companyName: profile.companyName,
-            companyAddress: profile.address,
+            companyAddress: profile.address || "",
             partyName: selectedParty.partyName,
             partyGst: selectedParty.gstNo,
             partyAddress: selectedParty.address,
@@ -200,7 +202,7 @@ export default function Dashboard() {
             ...numericData,
             userId: profile.uid,
             companyName: profile.companyName,
-            companyAddress: profile.address,
+            companyAddress: profile.address || "",
             ownerName: profile.ownerName,
             partyName: selectedParty.partyName,
             partyGst: selectedParty.gstNo,
