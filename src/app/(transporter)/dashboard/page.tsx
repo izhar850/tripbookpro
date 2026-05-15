@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, Plus, Edit, Trash2, FileText, ChevronRight, Loader2, Sparkles } from "lucide-react";
+import { AlertCircle, Plus, Edit, Trash2, FileText, ChevronRight, Loader2, Sparkles, Search } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -27,6 +27,7 @@ export default function Dashboard() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [editingTrip, setEditingTrip] = useState<any>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Stats
   const [stats, setStats] = useState({
@@ -289,6 +290,19 @@ export default function Dashboard() {
     setIsSheetOpen(true);
   };
 
+  const filteredTrips = trips.filter(trip => {
+    const query = searchQuery.toLowerCase();
+    return (
+      trip.lrNo?.toLowerCase().includes(query) ||
+      trip.partyName?.toLowerCase().includes(query) ||
+      trip.vehicleNo?.toLowerCase().includes(query) ||
+      trip.source?.toLowerCase().includes(query) ||
+      trip.destination?.toLowerCase().includes(query) ||
+      trip.goodsDescription?.toLowerCase().includes(query) ||
+      trip.date?.toLowerCase().includes(query)
+    );
+  });
+
   const { totalFreight, totalAmount, balance } = calculateTotals();
 
   return (
@@ -510,13 +524,24 @@ export default function Dashboard() {
 
       <Card className="bg-card border-border/50">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <CardTitle>Recent Shipments</CardTitle>
-            <Link href="/billing">
-              <Button variant="ghost" className="text-primary hover:text-primary/80">
-                Go to Billing <ChevronRight className="w-4 h-4 ml-1" />
-              </Button>
-            </Link>
+            <div className="flex items-center gap-4 w-full md:w-auto">
+              <div className="relative flex-1 md:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <Input 
+                  placeholder="Search trips..." 
+                  className="pl-10 bg-secondary/30"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              <Link href="/billing">
+                <Button variant="ghost" className="text-primary hover:text-primary/80 shrink-0">
+                  Go to Billing <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </Link>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -524,11 +549,11 @@ export default function Dashboard() {
             <div className="h-64 flex items-center justify-center">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
-          ) : trips.length === 0 ? (
+          ) : filteredTrips.length === 0 ? (
             <div className="h-64 flex flex-col items-center justify-center text-muted-foreground border-2 border-dashed border-border rounded-xl">
               <FileText className="w-12 h-12 mb-4 opacity-20" />
-              <p className="font-bold">No trips logged yet.</p>
-              <p className="text-sm">Start by creating a new trip entry.</p>
+              <p className="font-bold">{searchQuery ? "No matching shipments." : "No trips logged yet."}</p>
+              <p className="text-sm">{searchQuery ? "Try a different search term." : "Start by creating a new trip entry."}</p>
             </div>
           ) : (
             <Table>
@@ -545,7 +570,7 @@ export default function Dashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {trips.map((trip) => (
+                {filteredTrips.map((trip) => (
                   <TableRow key={trip.id} className="hover:bg-secondary/30 transition-colors group">
                     <TableCell className="font-bold text-primary">{trip.lrNo}</TableCell>
                     <TableCell className="text-sm">{trip.date}</TableCell>
