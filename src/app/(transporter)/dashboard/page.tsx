@@ -155,12 +155,21 @@ export default function Dashboard() {
 
     const { totalFreight, totalAmount, balance } = calculateTotals();
 
+    const numericData = {
+      packages: Number(formData.packages) || 0,
+      weight: Number(formData.weight) || 0,
+      rateQtl: Number(formData.rateQtl) || 0,
+      unloadingCharges: Number(formData.unloadingCharges) || 0,
+      advance: Number(formData.advance) || 0,
+    };
+
     try {
       if (editingTrip) {
         await runTransaction(db, async (transaction) => {
           const tripRef = doc(db, "trips", editingTrip.id);
           transaction.update(tripRef, {
             ...formData,
+            ...numericData,
             partyName: selectedParty.partyName,
             partyGst: selectedParty.gstNo,
             partyAddress: selectedParty.address,
@@ -187,6 +196,7 @@ export default function Dashboard() {
 
           transaction.set(newTripRef, {
             ...formData,
+            ...numericData,
             userId: profile.uid,
             companyName: profile.companyName,
             ownerName: profile.ownerName,
@@ -255,16 +265,16 @@ export default function Dashboard() {
       weight: trip.weight.toString(),
       goodsDescription: trip.goodsDescription,
       vehicleType: trip.vehicleType,
-      sizeL: trip.sizeL,
-      sizeW: trip.sizeW,
-      sizeH: trip.sizeH,
+      sizeL: trip.sizeL || "",
+      sizeW: trip.sizeW || "",
+      sizeH: trip.sizeH || "",
       source: trip.source,
       destination: trip.destination,
-      driverMobile: trip.driverMobile,
+      driverMobile: trip.driverMobile || "",
       rateQtl: trip.rateQtl.toString(),
       unloadingCharges: trip.unloadingCharges.toString(),
       advance: trip.advance.toString(),
-      remark: trip.remark,
+      remark: trip.remark || "",
       gstPayBy: trip.gstPayBy,
       notes: trip.notes || ""
     });
@@ -523,10 +533,10 @@ export default function Dashboard() {
                     <TableCell className="font-medium">{trip.partyName}</TableCell>
                     <TableCell className="text-xs font-mono">{trip.vehicleNo}</TableCell>
                     <TableCell className="text-sm">{trip.source} → {trip.destination}</TableCell>
-                    <TableCell className="text-right font-bold">₹{trip.totalAmount.toLocaleString()}</TableCell>
+                    <TableCell className="text-right font-bold">₹{Number(trip.totalAmount || 0).toLocaleString()}</TableCell>
                     <TableCell className="text-right">
                       <Badge variant={trip.balance > 0 ? "destructive" : "secondary"}>
-                        ₹{trip.balance.toLocaleString()}
+                        ₹{Number(trip.balance || 0).toLocaleString()}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">

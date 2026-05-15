@@ -108,9 +108,9 @@ function InvoiceContent() {
                     <td className="p-2 border-r border-black/10">{trip.source}-{trip.destination}</td>
                     <td className="p-2 border-r border-black/10 text-center">{trip.weight}</td>
                     <td className="p-2 border-r border-black/10 text-center">{trip.rateQtl}</td>
-                    <td className="p-2 border-r border-black/10 text-right">₹{trip.totalFreight.toFixed(2)}</td>
+                    <td className="p-2 border-r border-black/10 text-right">₹{Number(trip.totalFreight || 0).toFixed(2)}</td>
                     <td className="p-2 border-r border-black/10 text-right">₹{Number(trip.unloadingCharges || 0).toFixed(2)}</td>
-                    <td className="p-2 text-right font-bold">₹{trip.totalAmount.toFixed(2)}</td>
+                    <td className="p-2 text-right font-bold">₹{Number(trip.totalAmount || 0).toFixed(2)}</td>
                  </tr>
               ))}
               {/* Fill remaining space if needed */}

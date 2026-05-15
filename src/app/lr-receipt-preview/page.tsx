@@ -81,7 +81,7 @@ function LRReceiptContent() {
                 <td className="border-r-2 border-black p-4 font-medium uppercase">{trip.goodsDescription}</td>
                 <td className="border-r-2 border-black p-4 text-center font-bold">{trip.weight}</td>
                 <td className="border-r-2 border-black p-4 text-center font-bold font-mono">{trip.vehicleNo}</td>
-                <td className="p-4 text-right font-bold">₹{trip.rateQtl}</td>
+                <td className="p-4 text-right font-bold">₹{Number(trip.rateQtl || 0).toFixed(2)}</td>
               </tr>
             </tbody>
           </table>
@@ -109,15 +109,15 @@ function LRReceiptContent() {
           <div className="border-2 border-black p-0 divide-y-2 divide-black">
              <div className="p-2 flex justify-between">
                 <span className="text-xs font-bold">TOTAL FREIGHT:</span>
-                <span className="font-bold">₹{trip.totalFreight.toFixed(2)}</span>
+                <span className="font-bold">₹{Number(trip.totalFreight || 0).toFixed(2)}</span>
              </div>
              <div className="p-2 flex justify-between">
                 <span className="text-xs font-bold">ADVANCE PAID:</span>
-                <span className="font-bold">₹{trip.advance.toFixed(2)}</span>
+                <span className="font-bold">₹{Number(trip.advance || 0).toFixed(2)}</span>
              </div>
              <div className="p-2 flex justify-between bg-gray-100">
                 <span className="text-xs font-bold">BALANCE DUE:</span>
-                <span className="font-bold text-lg">₹{trip.balance.toFixed(2)}</span>
+                <span className="font-bold text-lg">₹{Number(trip.balance || 0).toFixed(2)}</span>
              </div>
           </div>
         </div>
