@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
@@ -70,11 +70,25 @@ export default function LoginPage() {
 
     setResetLoading(true);
     try {
-      await sendPasswordResetEmail(auth, resetEmail);
+      // Explicitly check if the user exists in Firestore first
+      const usersRef = collection(db, "users");
+      const q = query(usersRef, where("email", "==", resetEmail.trim()));
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        toast({
+          title: "Reset Failed",
+          description: "No registered account found with this email address.",
+          variant: "destructive",
+        });
+        setResetLoading(false);
+        return;
+      }
+
+      await sendPasswordResetEmail(auth, resetEmail.trim());
       setIsResetOpen(false);
       setResetEmail("");
       
-      // Using a toast for success feedback as SweetAlert2 is not in the project
       toast({
         title: "Success",
         description: "Password reset email sent successfully. Please check your inbox.",
