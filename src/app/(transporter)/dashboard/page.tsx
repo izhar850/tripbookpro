@@ -53,7 +53,7 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("");
 
   const [formData, setFormData] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: "",
     partyId: "",
     vehicleNo: "",
     packages: "",
@@ -73,6 +73,14 @@ export default function Dashboard() {
     gstPayBy: "transporter",
     notes: ""
   });
+
+  // Handle Hydration Safe Date
+  useEffect(() => {
+    setFormData(prev => ({
+      ...prev,
+      date: new Date().toISOString().split('T')[0]
+    }));
+  }, []);
 
   useEffect(() => {
     if (!profile || !db) return;
@@ -532,7 +540,7 @@ export default function Dashboard() {
           { label: "Total Shipments", value: stats.totalTrips, icon: Truck, color: "text-primary", sub: "Live Logs" },
           { label: "Gross Revenue", value: `₹${stats.totalRevenue.toLocaleString()}`, icon: TrendingUp, color: "text-green-500", sub: "Total Billed" },
           { label: "Pending Payments", value: `₹${stats.totalPending.toLocaleString()}`, icon: Wallet, color: "text-destructive", sub: "Action Required" },
-          { label: "Top Party Share", value: partyData[0] ? `${((partyData[0].value / stats.totalRevenue) * 100).toFixed(0)}%` : "0%", icon: UsersIcon, color: "text-blue-500", sub: partyData[0]?.name || "N/A" }
+          { label: "Top Party Share", value: partyData[0] ? `${((partyData[0].value / (stats.totalRevenue || 1)) * 100).toFixed(0)}%` : "0%", icon: UsersIcon, color: "text-blue-500", sub: partyData[0]?.name || "N/A" }
         ].map((stat, i) => (
           <Card key={i} className="bg-card border-border/50 hover:border-primary/50 transition-all group overflow-hidden relative">
             <div className={cn("absolute top-0 right-0 w-24 h-24 -mr-8 -mt-8 opacity-5 transition-transform group-hover:scale-110", stat.color.replace('text', 'bg'))} />
