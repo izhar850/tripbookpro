@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { useFirestore } from "@/firebase";
 import { collection, query, where, onSnapshot, doc, deleteDoc, runTransaction, serverTimestamp } from "firebase/firestore";
@@ -105,7 +105,7 @@ export default function Dashboard() {
     };
   }, [profile, db]);
 
-  const calculateTotals = () => {
+  const totals = useMemo(() => {
     const weight = Number(formData.weight) || 0;
     const rateQtl = Number(formData.rateQtl) || 0;
     const unloading = Number(formData.unloadingCharges) || 0;
@@ -116,7 +116,7 @@ export default function Dashboard() {
     const balance = totalAmount - advance;
 
     return { totalFreight, totalAmount, balance };
-  };
+  }, [formData.weight, formData.rateQtl, formData.unloadingCharges, formData.advance]);
 
   const handleAiSuggestion = async () => {
     if (!formData.source || !formData.destination || !formData.goodsDescription || !formData.weight || !formData.vehicleType) {
@@ -146,7 +146,7 @@ export default function Dashboard() {
 
       toast({
         title: "AI Suggestion Applied",
-        description: `Suggested rate: ₹${suggestion.suggestedRateQtl} per quintal. Check logistical notes below.`
+        description: `Suggested rate: ₹${suggestion.suggestedRateQtl} per quintal.`
       });
     } catch (error) {
       toast({ title: "AI Error", description: "Failed to get AI suggestions.", variant: "destructive" });
@@ -165,7 +165,7 @@ export default function Dashboard() {
       return;
     }
 
-    const { totalFreight, totalAmount, balance } = calculateTotals();
+    const { totalFreight, totalAmount, balance } = totals;
 
     const numericData = {
       packages: Number(formData.packages) || 0,
@@ -177,8 +177,8 @@ export default function Dashboard() {
 
     try {
       if (editingTrip) {
+        const tripRef = doc(db, "trips", editingTrip.id);
         await runTransaction(db, async (transaction) => {
-          const tripRef = doc(db, "trips", editingTrip.id);
           transaction.update(tripRef, {
             ...formData,
             ...numericData,
@@ -198,17 +198,17 @@ export default function Dashboard() {
         });
         toast({ title: "Trip Updated", description: "The trip details have been updated." });
       } else {
+        const counterRef = doc(db, "counters", profile.uid);
+        const newTripRef = doc(collection(db, "trips"));
+        
         await runTransaction(db, async (transaction) => {
-          const counterRef = doc(db, "counters", profile.uid);
           const counterDoc = await transaction.get(counterRef);
-          
           let nextLrNo = 1;
           if (counterDoc.exists()) {
             nextLrNo = (counterDoc.data().lastLrNo || 0) + 1;
           }
 
           const lrNo = `LR-${nextLrNo.toString().padStart(4, '0')}`;
-          const newTripRef = doc(collection(db, "trips"));
 
           transaction.set(newTripRef, {
             ...formData,
@@ -271,7 +271,7 @@ export default function Dashboard() {
     if (!db || !tripToDelete) return;
     try {
       await deleteDoc(doc(db, "trips", tripToDelete.id));
-      toast({ title: "Deleted", description: `Trip ${tripToDelete.lrNo} record deleted successfully.` });
+      toast({ title: "Deleted", description: `Trip ${tripToDelete.lrNo} record deleted.` });
     } catch (error: any) {
       toast({ title: "Error Deleting", description: error.message, variant: "destructive" });
     } finally {
@@ -318,34 +318,32 @@ export default function Dashboard() {
     );
   });
 
-  const { totalFreight, totalAmount, balance } = calculateTotals();
-
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 md:space-y-8">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-headline font-bold">Welcome, {profile?.companyName}</h1>
-          <p className="text-muted-foreground">Logistics Overview & Fleet Operations</p>
+          <h1 className="text-2xl md:text-3xl font-headline font-bold">Fleet Operations</h1>
+          <p className="text-sm text-muted-foreground">Manage your shipments and logistics logs</p>
         </div>
         <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
           <SheetTrigger asChild>
-            <Button onClick={() => { setEditingTrip(null); resetForm(); }} className="bg-gradient-primary shadow-lg shadow-indigo-500/20 h-11 px-6 font-bold">
+            <Button onClick={() => { setEditingTrip(null); resetForm(); }} className="w-full md:w-auto bg-gradient-primary shadow-lg shadow-indigo-500/20 h-11 px-6 font-bold">
               <Plus className="w-5 h-5 mr-2" /> New Trip Entry
             </Button>
           </SheetTrigger>
-          <SheetContent className="sm:max-w-xl overflow-y-auto bg-card border-l border-border/50 scrollbar-hide">
+          <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto bg-card border-l border-border/50 scrollbar-hide">
             <SheetHeader className="pb-6">
               <SheetTitle className="text-2xl font-headline font-bold">
-                {editingTrip ? `Edit Trip Record: ${editingTrip.lrNo}` : "New Trip Log"}
+                {editingTrip ? `Edit Trip: ${editingTrip.lrNo}` : "New Trip Log"}
               </SheetTitle>
             </SheetHeader>
-            <form onSubmit={handleSaveTrip} className="space-y-6 pb-20">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2 col-span-2 md:col-span-1">
+            <form onSubmit={handleSaveTrip} className="space-y-6 pb-12">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
                   <Label>Date</Label>
                   <Input type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} required />
                 </div>
-                <div className="space-y-2 col-span-2 md:col-span-1">
+                <div className="space-y-2">
                   <Label>Party (Client)</Label>
                   <Select value={formData.partyId} onValueChange={val => setFormData({ ...formData, partyId: val })}>
                     <SelectTrigger>
@@ -360,7 +358,7 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Vehicle Number</Label>
                   <Input placeholder="RJ-14-GA-1234" value={formData.vehicleNo} onChange={e => setFormData({ ...formData, vehicleNo: e.target.value })} required />
@@ -373,31 +371,31 @@ export default function Dashboard() {
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label>Size L (ft)</Label>
+                  <Label>Length (ft)</Label>
                   <Input type="number" placeholder="L" value={formData.sizeL} onChange={e => setFormData({ ...formData, sizeL: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Size W (ft)</Label>
+                  <Label>Width (ft)</Label>
                   <Input type="number" placeholder="W" value={formData.sizeW} onChange={e => setFormData({ ...formData, sizeW: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Size H (ft)</Label>
+                  <Label>Height (ft)</Label>
                   <Input type="number" placeholder="H" value={formData.sizeH} onChange={e => setFormData({ ...formData, sizeH: e.target.value })} />
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>Packages</Label>
-                  <Input type="number" placeholder="50" value={formData.packages} onChange={e => setFormData({ ...formData, packages: e.target.value })} required />
+                  <Input type="number" placeholder="Qty" value={formData.packages} onChange={e => setFormData({ ...formData, packages: e.target.value })} required />
                 </div>
                 <div className="space-y-2">
                   <Label>Weight (Qtl)</Label>
-                  <Input type="number" step="0.01" placeholder="120.5" value={formData.weight} onChange={e => setFormData({ ...formData, weight: e.target.value })} required />
+                  <Input type="number" step="0.01" placeholder="Wt" value={formData.weight} onChange={e => setFormData({ ...formData, weight: e.target.value })} required />
                 </div>
                 <div className="space-y-2">
                   <Label>Driver Mobile</Label>
-                  <Input placeholder="Phone No." value={formData.driverMobile} onChange={e => setFormData({ ...formData, driverMobile: e.target.value })} />
+                  <Input placeholder="Phone" value={formData.driverMobile} onChange={e => setFormData({ ...formData, driverMobile: e.target.value })} />
                 </div>
               </div>
 
@@ -406,14 +404,14 @@ export default function Dashboard() {
                 <Input placeholder="Cement Bags / Iron Rods" value={formData.goodsDescription} onChange={e => setFormData({ ...formData, goodsDescription: e.target.value })} required />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Source (From)</Label>
-                  <Input placeholder="City Name" value={formData.source} onChange={e => setFormData({ ...formData, source: e.target.value })} required />
+                  <Input placeholder="City" value={formData.source} onChange={e => setFormData({ ...formData, source: e.target.value })} required />
                 </div>
                 <div className="space-y-2">
                   <Label>Destination (To)</Label>
-                  <Input placeholder="City Name" value={formData.destination} onChange={e => setFormData({ ...formData, destination: e.target.value })} required />
+                  <Input placeholder="City" value={formData.destination} onChange={e => setFormData({ ...formData, destination: e.target.value })} required />
                 </div>
               </div>
 
@@ -425,24 +423,24 @@ export default function Dashboard() {
                 disabled={isAiLoading}
               >
                 {isAiLoading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Sparkles className="w-5 h-5 mr-2" />}
-                Get AI Pricing Suggestion
+                AI Pricing Suggestion
               </Button>
 
-              <div className="grid grid-cols-2 gap-4 p-4 bg-secondary/30 rounded-xl border border-border/50">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-secondary/30 rounded-xl border border-border/50">
                 <div className="space-y-2">
                   <Label>Rate (per Quintal)</Label>
-                  <Input type="number" placeholder="450" value={formData.rateQtl} onChange={e => setFormData({ ...formData, rateQtl: e.target.value })} required />
+                  <Input type="number" placeholder="0" value={formData.rateQtl} onChange={e => setFormData({ ...formData, rateQtl: e.target.value })} required />
                 </div>
                 <div className="space-y-2">
-                  <Label>Unloading Charges</Label>
+                  <Label>Unloading</Label>
                   <Input type="number" placeholder="0" value={formData.unloadingCharges} onChange={e => setFormData({ ...formData, unloadingCharges: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Advance Received</Label>
+                  <Label>Advance</Label>
                   <Input type="number" placeholder="0" value={formData.advance} onChange={e => setFormData({ ...formData, advance: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <Label>GST Payable By</Label>
+                  <Label>GST By</Label>
                   <Select value={formData.gstPayBy} onValueChange={val => setFormData({ ...formData, gstPayBy: val })}>
                     <SelectTrigger>
                       <SelectValue />
@@ -459,169 +457,141 @@ export default function Dashboard() {
               <Card className="bg-primary/5 border-primary/20">
                 <CardContent className="pt-6 space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Total Freight (Weight x Rate)</span>
-                    <span className="font-bold">₹{totalFreight.toFixed(2)}</span>
+                    <span className="text-muted-foreground">Freight Amount</span>
+                    <span className="font-bold">₹{totals.totalFreight.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Unloading Charges</span>
+                    <span className="text-muted-foreground">Unloading</span>
                     <span className="font-bold">₹{Number(formData.unloadingCharges || 0).toFixed(2)}</span>
                   </div>
                   <div className="h-px bg-border my-2" />
-                  <div className="flex justify-between">
-                    <span className="font-bold">Total Amount</span>
-                    <span className="font-bold text-primary">₹{totalAmount.toFixed(2)}</span>
+                  <div className="flex justify-between font-bold">
+                    <span>Total Bill</span>
+                    <span className="text-primary">₹{totals.totalAmount.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Advance Received</span>
+                    <span className="text-muted-foreground">Advance</span>
                     <span className="font-bold text-destructive">- ₹{Number(formData.advance || 0).toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between text-lg pt-2 border-t">
-                    <span className="font-headline font-bold">Balance Due</span>
-                    <span className="font-headline font-bold text-accent">₹{balance.toFixed(2)}</span>
+                  <div className="flex justify-between text-lg pt-2 border-t font-headline font-bold">
+                    <span>Balance Due</span>
+                    <span className="text-accent">₹{totals.balance.toFixed(2)}</span>
                   </div>
                 </CardContent>
               </Card>
 
               <div className="space-y-2">
-                <Label>Internal Logistical Notes (AI Suggested)</Label>
+                <Label>Logistical Notes (AI Suggested)</Label>
                 <textarea 
-                  className="w-full h-24 p-3 bg-secondary/50 rounded-lg text-sm border focus:ring-primary"
-                  placeholder="Additional route or handling info..."
+                  className="w-full h-24 p-3 bg-secondary/50 rounded-lg text-sm border focus:ring-primary outline-none"
+                  placeholder="AI generated tips for this route..."
                   value={formData.notes}
                   onChange={e => setFormData({ ...formData, notes: e.target.value })}
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label>Public Remarks (Visible on LR)</Label>
-                <Input placeholder="Extra instructions" value={formData.remark} onChange={e => setFormData({ ...formData, remark: e.target.value })} />
-              </div>
-
-              <Button type="submit" className="w-full h-12 bg-gradient-primary font-bold text-lg">
-                {editingTrip ? "Update Trip Entry" : "Save & Generate LR"}
+              <Button type="submit" className="w-full h-12 bg-gradient-primary font-bold text-lg sticky bottom-0">
+                {editingTrip ? "Update Entry" : "Save & Generate LR"}
               </Button>
             </form>
           </SheetContent>
         </Sheet>
       </div>
 
-      {profile && !profile.profileCompleted && (
-        <div className="flex items-center gap-4 p-4 bg-destructive/10 border border-destructive/20 rounded-xl text-destructive">
-          <AlertCircle className="w-6 h-6 shrink-0" />
-          <div className="flex-1">
-            <p className="font-bold">Incomplete Profile</p>
-            <p className="text-sm opacity-80">Please complete your bank and company details in the Profile section to enable invoice printing.</p>
-          </div>
-          <Link href="/profile">
-            <Button variant="outline" className="border-destructive/50 text-destructive hover:bg-destructive/10 font-bold">Complete Now</Button>
-          </Link>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {[
-          { label: "Total Trips", value: stats.totalTrips, sub: "Historical load count", color: "text-primary" },
-          { label: "Total Revenue", value: `₹${stats.totalRevenue.toLocaleString()}`, sub: "Gross billing amount", color: "text-green-500" },
-          { label: "Total Advance", value: `₹${stats.totalAdvance.toLocaleString()}`, sub: "Cash on dispatch", color: "text-blue-500" },
-          { label: "Pending Balance", value: `₹${stats.totalPending.toLocaleString()}`, sub: "Outstanding debt", color: "text-destructive" }
+          { label: "Total Shipments", value: stats.totalTrips, color: "text-primary" },
+          { label: "Gross Revenue", value: `₹${stats.totalRevenue.toLocaleString()}`, color: "text-green-500" },
+          { label: "Cash Advance", value: `₹${stats.totalAdvance.toLocaleString()}`, color: "text-blue-500" },
+          { label: "Outstanding", value: `₹${stats.totalPending.toLocaleString()}`, color: "text-destructive" }
         ].map((stat, i) => (
           <Card key={i} className="bg-card border-border/50">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">{stat.label}</CardTitle>
+            <CardHeader className="p-4 pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-widest">{stat.label}</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className={cn("text-2xl font-bold font-headline", stat.color)}>{stat.value}</div>
-              <p className="text-xs text-muted-foreground mt-1">{stat.sub}</p>
+            <CardContent className="p-4 pt-0">
+              <div className={cn("text-2xl font-bold font-headline truncate", stat.color)}>{stat.value}</div>
             </CardContent>
           </Card>
         ))}
       </div>
 
       <Card className="bg-card border-border/50">
-        <CardHeader>
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <CardTitle>Recent Shipments</CardTitle>
-            <div className="flex items-center gap-4 w-full md:w-auto">
-              <div className="relative flex-1 md:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                <Input 
-                  placeholder="Search trips..." 
-                  className="pl-10 bg-secondary/30"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-              <Link href="/billing">
-                <Button variant="ghost" className="text-primary hover:text-primary/80 shrink-0">
-                  Go to Billing <ChevronRight className="w-4 h-4 ml-1" />
-                </Button>
-              </Link>
+        <CardHeader className="p-4 md:p-6 border-b border-border/50">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <CardTitle className="text-xl">Recent Shipments</CardTitle>
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+              <Input 
+                placeholder="Search shipments..." 
+                className="pl-10 bg-secondary/30 h-10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {loading ? (
             <div className="h-64 flex items-center justify-center">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
           ) : filteredTrips.length === 0 ? (
-            <div className="h-64 flex flex-col items-center justify-center text-muted-foreground border-2 border-dashed border-border rounded-xl">
+            <div className="h-64 flex flex-col items-center justify-center text-muted-foreground p-8">
               <FileText className="w-12 h-12 mb-4 opacity-20" />
-              <p className="font-bold">{searchQuery ? "No matching shipments." : "No trips logged yet."}</p>
-              <p className="text-sm">{searchQuery ? "Try a different search term." : "Start by creating a new trip entry."}</p>
+              <p className="font-bold">No matching records.</p>
             </div>
           ) : (
-            <Table>
-              <TableHeader className="bg-secondary/50">
-                <TableRow>
-                  <TableHead className="font-bold">LR No</TableHead>
-                  <TableHead className="font-bold">Date</TableHead>
-                  <TableHead className="font-bold">Party</TableHead>
-                  <TableHead className="font-bold">Vehicle</TableHead>
-                  <TableHead className="font-bold">Route</TableHead>
-                  <TableHead className="font-bold text-right">Freight</TableHead>
-                  <TableHead className="font-bold text-right">Balance</TableHead>
-                  <TableHead className="font-bold text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredTrips.map((trip) => (
-                  <TableRow key={trip.id} className="hover:bg-secondary/30 transition-colors group">
-                    <TableCell className="font-bold text-primary">{trip.lrNo}</TableCell>
-                    <TableCell className="text-sm">{trip.date}</TableCell>
-                    <TableCell className="font-medium">{trip.partyName}</TableCell>
-                    <TableCell className="text-xs font-mono">{trip.vehicleNo}</TableCell>
-                    <TableCell className="text-sm">{trip.source} → {trip.destination}</TableCell>
-                    <TableCell className="text-right font-bold">₹{Number(trip.totalAmount || 0).toLocaleString()}</TableCell>
-                    <TableCell className="text-right">
-                      <Badge variant={Number(trip.balance || 0) > 0 ? "destructive" : "secondary"}>
-                        ₹{Number(trip.balance || 0).toLocaleString()}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Link href={`/lr-receipt-preview?id=${trip.id}`}>
-                          <Button size="icon" variant="ghost" className="text-green-500 hover:bg-green-500/10">
-                            <FileText className="w-4 h-4" />
-                          </Button>
-                        </Link>
-                        <Button size="icon" variant="ghost" onClick={() => handleEditTrip(trip)} className="text-blue-500 hover:bg-blue-500/10">
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button size="icon" variant="ghost" onClick={() => setTripToDelete(trip)} className="text-destructive hover:bg-destructive/10">
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-secondary/30">
+                  <TableRow>
+                    <TableHead className="font-bold whitespace-nowrap">LR No</TableHead>
+                    <TableHead className="font-bold whitespace-nowrap">Party</TableHead>
+                    <TableHead className="font-bold whitespace-nowrap">Vehicle</TableHead>
+                    <TableHead className="font-bold whitespace-nowrap">Route</TableHead>
+                    <TableHead className="font-bold text-right">Amount</TableHead>
+                    <TableHead className="font-bold text-right">Status</TableHead>
+                    <TableHead className="font-bold text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredTrips.map((trip) => (
+                    <TableRow key={trip.id} className="hover:bg-secondary/20 transition-colors group">
+                      <TableCell className="font-bold text-primary py-4">{trip.lrNo}</TableCell>
+                      <TableCell className="font-medium truncate max-w-[150px]">{trip.partyName}</TableCell>
+                      <TableCell className="text-xs font-mono">{trip.vehicleNo}</TableCell>
+                      <TableCell className="text-sm truncate max-w-[150px]">{trip.source} → {trip.destination}</TableCell>
+                      <TableCell className="text-right font-bold">₹{Number(trip.totalAmount || 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-right">
+                        <Badge variant={Number(trip.balance || 0) > 0 ? "destructive" : "secondary"}>
+                          {Number(trip.balance || 0) > 0 ? `₹${Number(trip.balance).toLocaleString()} Due` : "Paid"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Link href={`/lr-receipt-preview?id=${trip.id}`}>
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-green-500">
+                              <FileText className="w-4 h-4" />
+                            </Button>
+                          </Link>
+                          <Button size="icon" variant="ghost" onClick={() => handleEditTrip(trip)} className="h-8 w-8 text-blue-500">
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" onClick={() => setTripToDelete(trip)} className="h-8 w-8 text-destructive">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Stylish Delete Confirmation Alert */}
       <AlertDialog open={!!tripToDelete} onOpenChange={(open) => !open && setTripToDelete(null)}>
         <AlertDialogContent className="bg-card border border-border/50">
           <AlertDialogHeader>
@@ -629,12 +599,12 @@ export default function Dashboard() {
               <Trash2 className="w-6 h-6" /> Confirm Deletion
             </AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground pt-2">
-              Are you sure you want to permanently delete trip <span className="font-bold text-foreground">{tripToDelete?.lrNo}</span>? 
-              This action cannot be undone and will remove all freight records for this shipment.
+              Are you sure you want to delete shipment <span className="font-bold text-foreground">{tripToDelete?.lrNo}</span>? 
+              This will remove all associated financial and logistics data.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="pt-4">
-            <AlertDialogCancel className="bg-secondary hover:bg-secondary/80 border-none font-bold">Cancel</AlertDialogCancel>
+          <AlertDialogFooter className="pt-4 gap-2">
+            <AlertDialogCancel className="bg-secondary border-none font-bold">Cancel</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleDeleteTrip}
               className="bg-destructive hover:bg-destructive/90 text-destructive-foreground font-bold shadow-lg shadow-destructive/20"
