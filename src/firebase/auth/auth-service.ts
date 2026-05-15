@@ -5,6 +5,7 @@ import {
   createUserWithEmailAndPassword, 
   signOut,
   onAuthStateChanged,
+  sendPasswordResetEmail,
   type User,
   type Auth
 } from 'firebase/auth';
@@ -28,6 +29,13 @@ export const signup = (auth: Auth, email: string, pass: string) => {
  */
 export const logout = (auth: Auth) => {
   return signOut(auth);
+};
+
+/**
+ * Sends a password reset email.
+ */
+export const resetPassword = (auth: Auth, email: string) => {
+  return sendPasswordResetEmail(auth, email);
 };
 
 /**

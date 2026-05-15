@@ -3,20 +3,32 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Loader2, Truck } from "lucide-react";
+import { Loader2, Truck, KeyRound } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [isResetOpen, setIsResetOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
   const [formData, setFormData] = useState({ email: "", password: "" });
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -42,6 +54,46 @@ export default function LoginPage() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail) {
+      toast({
+        title: "Error",
+        description: "Please enter your email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setResetLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, resetEmail);
+      setIsResetOpen(false);
+      setResetEmail("");
+      
+      // Using a toast for success feedback as SweetAlert2 is not in the project
+      toast({
+        title: "Success",
+        description: "Password reset email sent successfully. Please check your inbox.",
+      });
+    } catch (error: any) {
+      let message = "Could not send reset email. Please try again.";
+      if (error.code === "auth/user-not-found") {
+        message = "No user found with this email address.";
+      } else if (error.code === "auth/invalid-email") {
+        message = "Please enter a valid email address.";
+      }
+      
+      toast({
+        title: "Reset Failed",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -71,12 +123,53 @@ export default function LoginPage() {
                 required
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="bg-secondary/50"
+                className="bg-secondary/50 border-border/50"
               />
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Password</Label>
+                <Dialog open={isResetOpen} onOpenChange={setIsResetOpen}>
+                  <DialogTrigger asChild>
+                    <button type="button" className="text-xs text-primary hover:underline font-bold">
+                      Forgot Password?
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[425px] bg-card border-border/50">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        <KeyRound className="w-5 h-5 text-primary" /> Reset Password
+                      </DialogTitle>
+                      <DialogDescription>
+                        Enter your registered email address and we'll send you a link to reset your password.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleResetPassword} className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="reset-email">Work Email</Label>
+                        <Input
+                          id="reset-email"
+                          type="email"
+                          placeholder="name@company.com"
+                          required
+                          value={resetEmail}
+                          onChange={(e) => setResetEmail(e.target.value)}
+                          className="bg-secondary/50 border-border/50"
+                        />
+                      </div>
+                      <DialogFooter>
+                        <Button 
+                          type="submit" 
+                          disabled={resetLoading}
+                          className="w-full bg-gradient-primary font-bold"
+                        >
+                          {resetLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                          Send Reset Link
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
               </div>
               <Input
                 id="password"
@@ -84,7 +177,7 @@ export default function LoginPage() {
                 required
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                className="bg-secondary/50"
+                className="bg-secondary/50 border-border/50"
               />
             </div>
             <Button
