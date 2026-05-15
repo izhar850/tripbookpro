@@ -99,7 +99,7 @@ function LRReceiptContent() {
               <tr className="border-b-2 border-black h-40 align-top">
                 <td className="border-r-2 border-black p-4 text-center font-bold">{trip.packages}</td>
                 <td className="border-r-2 border-black p-4 font-medium uppercase">{trip.goodsDescription}</td>
-                <td className="border-r-2 border-black p-4 text-center font-bold">{trip.weight}</td>
+                <td className="border-r-2 border-black p-4 text-center font-bold">{Number(trip.weight || 0)}</td>
                 <td className="border-r-2 border-black p-4 text-center font-bold font-mono">{trip.vehicleNo}</td>
                 <td className="p-4 text-right font-bold">₹{Number(trip.rateQtl || 0).toFixed(2)}</td>
               </tr>
@@ -120,9 +120,9 @@ function LRReceiptContent() {
             <div className="mt-6 flex gap-4">
               <span className="text-xs font-bold">GST PAYABLE BY:</span>
               <div className="flex gap-2 text-xs uppercase font-bold">
-                 <span>[{trip.gstPayBy === 'consigner' ? 'X' : ' '}] Consignor</span>
-                 <span>[{trip.gstPayBy === 'consignee' ? 'X' : ' '}] Consignee</span>
-                 <span>[{trip.gstPayBy === 'transporter' ? 'X' : ' '}] Transporter</span>
+                 <span>[{trip.gstPayBy === 'consigner' ? '✓' : ' '}] Consignor</span>
+                 <span>[{trip.gstPayBy === 'consignee' ? '✓' : ' '}] Consignee</span>
+                 <span>[{trip.gstPayBy === 'transporter' ? '✓' : ' '}] Transporter</span>
               </div>
             </div>
           </div>
