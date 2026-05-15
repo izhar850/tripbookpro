@@ -3,15 +3,16 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase";
-import { collection, query, onSnapshot, getDocs, orderBy } from "firebase/firestore";
+import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Loader2, ShieldCheck, Truck, Users, PieChart, TrendingUp, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
 
 export default function AdminPage() {
-  const { profile, user, logout, loading: authLoading } = useAuth();
+  const { profile, logout, loading: authLoading } = useAuth();
   const router = useRouter();
   const [transporters, setTransporters] = useState<any[]>([]);
   const [allTrips, setAllTrips] = useState<any[]>([]);
@@ -141,9 +142,4 @@ export default function AdminPage() {
       </div>
     </div>
   );
-}
-
-// Minimal where implementation for simple simulation if not using Firebase SDK correctly in this file
-function where(field: string, op: string, val: any) {
-  return { field, op, val };
 }
