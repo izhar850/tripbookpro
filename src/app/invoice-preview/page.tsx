@@ -8,6 +8,45 @@ import { doc, getDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Printer, ArrowLeft, Loader2, FileDown } from "lucide-react";
 
+// Helper for number to words (Indian System)
+function numberToWords(num: number): string {
+  if (num === 0) return 'Zero';
+  
+  const single = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+  const double = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+  const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  function convert(n: number): string {
+    if (n < 10) return single[n];
+    if (n < 20) return double[n - 10];
+    if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 !== 0 ? ' ' + single[n % 10] : '');
+    if (n < 1000) return single[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' and ' + convert(n % 100) : '');
+    return '';
+  }
+
+  function handleLarge(n: number): string {
+    let res = '';
+    if (n >= 10000000) {
+      res += handleLarge(Math.floor(n / 10000000)) + ' Crore ';
+      n %= 10000000;
+    }
+    if (n >= 100000) {
+      res += convert(Math.floor(n / 100000)) + ' Lakh ';
+      n %= 100000;
+    }
+    if (n >= 1000) {
+      res += convert(Math.floor(n / 1000)) + ' Thousand ';
+      n %= 1000;
+    }
+    if (n > 0) {
+      res += convert(n);
+    }
+    return res.trim();
+  }
+
+  return handleLarge(Math.floor(num));
+}
+
 function InvoiceContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -75,35 +114,43 @@ function InvoiceContent() {
 
   return (
     <div className="min-h-screen bg-slate-900 p-4 md:p-8 font-body">
-      <div ref={invoiceRef} className="max-w-5xl mx-auto !bg-white !text-black border-2 border-black p-8 shadow-2xl">
+      <div ref={invoiceRef} className="max-w-5xl mx-auto !bg-white !text-black border-2 border-black p-8 shadow-2xl printable-area">
+        {/* Force colors for PDF generation */}
+        <style dangerouslySetInnerHTML={{ __html: `
+          .printable-area { background-color: white !important; color: black !important; }
+          .printable-area * { color: black !important; border-color: black !important; }
+          .printable-area .bg-black { background-color: black !important; color: white !important; }
+          .printable-area .bg-black * { color: white !important; }
+        `}} />
+
         {/* Header */}
         <div className="flex justify-between mb-8 border-b-4 border-black pb-6">
            <div>
-              <h1 className="text-4xl font-bold uppercase mb-2 !text-black">{profile.companyName}</h1>
-              <p className="text-sm italic !text-black">{profile.address}</p>
-              <div className="mt-4 grid grid-cols-2 gap-x-8 gap-y-1 text-sm !text-black">
+              <h1 className="text-4xl font-bold uppercase mb-2">{profile.companyName}</h1>
+              <p className="text-sm italic">{profile.address}</p>
+              <div className="mt-4 grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
                  <p><span className="font-bold">Email:</span> {profile.email}</p>
                  <p><span className="font-bold">Phone:</span> {profile.mobile}</p>
                  <p><span className="font-bold">GSTIN:</span> {profile.gstNo}</p>
                  <p><span className="font-bold">Office:</span> {profile.officePhone || 'N/A'}</p>
               </div>
            </div>
-           <div className="text-right flex flex-col justify-center !text-black">
-              <h2 className="text-3xl font-bold border-b-2 border-black inline-block ml-auto mb-4 !text-black">TAX INVOICE</h2>
+           <div className="text-right flex flex-col justify-center">
+              <h2 className="text-3xl font-bold border-b-2 border-black inline-block ml-auto mb-4">TAX INVOICE</h2>
               <p className="text-lg font-bold">Bill No: {billNo}</p>
-              <p className="text-md">Date: {new Date(invoice.createdAt?.seconds * 1000).toLocaleDateString()}</p>
+              <p className="text-md">Date: {invoice.createdAt?.seconds ? new Date(invoice.createdAt.seconds * 1000).toLocaleDateString() : invoice.date || 'N/A'}</p>
            </div>
         </div>
 
         {/* Party Details */}
-        <div className="mb-8 p-4 bg-gray-50 border-2 border-black !text-black">
+        <div className="mb-8 p-4 bg-gray-50 border-2 border-black">
            <h3 className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-widest">Billing To:</h3>
            <div className="grid grid-cols-2">
               <div>
-                 <p className="text-xl font-bold uppercase !text-black">{partyName}</p>
-                 <p className="text-sm max-w-md !text-black">{partyAddress}</p>
+                 <p className="text-xl font-bold uppercase">{partyName}</p>
+                 <p className="text-sm max-w-md">{partyAddress}</p>
               </div>
-              <div className="text-right !text-black">
+              <div className="text-right">
                  <p><span className="font-bold">GST No:</span> {partyGst || 'UNREGISTERED'}</p>
                  <p><span className="font-bold">Mobile:</span> {partyMobile || 'N/A'}</p>
               </div>
@@ -111,7 +158,7 @@ function InvoiceContent() {
         </div>
 
         {/* Items Table */}
-        <table className="w-full border-2 border-black mb-8 !text-black">
+        <table className="w-full border-2 border-black mb-8">
            <thead>
               <tr className="bg-black text-white border-b-2 border-black">
                  <th className="p-2 border-r border-white/20 text-xs">DATE</th>
@@ -125,7 +172,7 @@ function InvoiceContent() {
                  <th className="p-2 text-xs">AMOUNT</th>
               </tr>
            </thead>
-           <tbody className="divide-y divide-black/10 !text-black">
+           <tbody className="divide-y divide-black/10">
               {trips.map((trip: any, idx: number) => (
                  <tr key={idx} className="text-sm">
                     <td className="p-2 border-r border-black/10 text-center">{trip.date}</td>
@@ -144,7 +191,7 @@ function InvoiceContent() {
               </tr>
            </tbody>
            <tfoot>
-              <tr className="bg-gray-100 border-t-2 border-black !text-black">
+              <tr className="bg-gray-100 border-t-2 border-black">
                  <td colSpan={8} className="p-3 text-right font-bold text-lg">GRAND TOTAL</td>
                  <td className="p-3 text-right font-bold text-xl">₹{invoiceTotal.toLocaleString()}</td>
               </tr>
@@ -152,19 +199,19 @@ function InvoiceContent() {
         </table>
 
         {/* Footer */}
-        <div className="grid grid-cols-2 gap-8 !text-black">
-           <div className="border-2 border-black p-4 !text-black">
-              <h4 className="font-bold text-sm border-b border-black mb-2 pb-1 !text-black">BANK SETTLEMENT DETAILS</h4>
-              <p className="text-sm !text-black"><span className="font-bold">Bank Name:</span> {profile.bankName}</p>
-              <p className="text-sm !text-black"><span className="font-bold">A/C No:</span> {profile.accountNo}</p>
-              <p className="text-sm !text-black"><span className="font-bold">IFSC Code:</span> {profile.ifscCode}</p>
-              <div className="mt-4 pt-4 border-t border-black !text-black">
-                 <p className="text-xs font-bold uppercase italic">Amount in words: Rupees {invoiceTotal.toLocaleString()} Only</p>
+        <div className="grid grid-cols-2 gap-8">
+           <div className="border-2 border-black p-4">
+              <h4 className="font-bold text-sm border-b border-black mb-2 pb-1">BANK SETTLEMENT DETAILS</h4>
+              <p className="text-sm"><span className="font-bold">Bank Name:</span> {profile.bankName}</p>
+              <p className="text-sm"><span className="font-bold">A/C No:</span> {profile.accountNo}</p>
+              <p className="text-sm"><span className="font-bold">IFSC Code:</span> {profile.ifscCode}</p>
+              <div className="mt-4 pt-4 border-t border-black">
+                 <p className="text-xs font-bold uppercase italic">Amount in words: Rupees {numberToWords(invoiceTotal)} Only</p>
               </div>
            </div>
-           <div className="text-right flex flex-col justify-end items-end p-4 !text-black">
-              <p className="font-bold uppercase text-xs mb-16 !text-black">For {profile.companyName}</p>
-              <p className="font-bold uppercase text-sm border-t-2 border-black pt-2 !text-black">Authorized Signatory</p>
+           <div className="text-right flex flex-col justify-end items-end p-4">
+              <p className="font-bold uppercase text-xs mb-16">For {profile.companyName}</p>
+              <p className="font-bold uppercase text-sm border-t-2 border-black pt-2">Authorized Signatory</p>
            </div>
         </div>
       </div>
