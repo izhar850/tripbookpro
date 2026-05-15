@@ -40,10 +40,101 @@ function MobileHeader() {
   );
 }
 
-export default function TransporterLayout({ children }: { children: React.ReactNode }) {
-  const { user, profile, loading, logout } = useAuth();
-  const router = useRouter();
+function NavMenu() {
   const pathname = usePathname();
+  const { setOpenMobile, isMobile } = useSidebar();
+
+  const navItems = [
+    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { name: "Parties", href: "/parties", icon: Users },
+    { name: "Billing", href: "/billing", icon: CreditCard },
+    { name: "Profile", href: "/profile", icon: User },
+  ];
+
+  const handleNavClick = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
+
+  return (
+    <SidebarMenu>
+      {navItems.map((item) => (
+        <SidebarMenuItem key={item.name}>
+          <SidebarMenuButton 
+            asChild
+            isActive={pathname === item.href}
+            onClick={handleNavClick}
+            className={cn(
+              "w-full h-11 px-4 flex items-center gap-3 rounded-lg transition-all duration-200",
+              pathname === item.href 
+                ? "bg-primary/10 text-primary font-bold" 
+                : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+            )}
+          >
+            <Link href={item.href}>
+              <item.icon className={cn("w-5 h-5", pathname === item.href ? "text-primary" : "")} />
+              <span>{item.name}</span>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      ))}
+    </SidebarMenu>
+  );
+}
+
+function TransporterSidebar() {
+  const { profile, logout } = useAuth();
+  const { isMobile, setOpenMobile } = useSidebar();
+
+  const handleLogout = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+    logout();
+  };
+
+  return (
+    <Sidebar className="border-r border-border/50 bg-card">
+      <SidebarHeader className="p-6">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 bg-gradient-primary rounded-lg flex items-center justify-center shadow-md">
+            <Truck className="text-white w-5 h-5" />
+          </div>
+          <div className="flex flex-col">
+            <span className="font-headline font-bold text-lg leading-tight">TripBook</span>
+            <span className="text-[10px] uppercase tracking-widest text-primary font-bold">Pro SaaS</span>
+          </div>
+        </div>
+      </SidebarHeader>
+      <SidebarContent className="px-3">
+        <NavMenu />
+      </SidebarContent>
+      <SidebarFooter className="p-4 border-t border-border/50">
+        <div className="flex items-center gap-3 mb-4 px-2">
+          <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center text-xs font-bold text-primary">
+            {profile?.ownerName?.charAt(0) || 'U'}
+          </div>
+          <div className="flex flex-col min-w-0">
+            <span className="text-sm font-bold truncate">{profile?.companyName}</span>
+            <span className="text-[10px] text-muted-foreground truncate">{profile?.email}</span>
+          </div>
+        </div>
+        <button
+          onClick={handleLogout}
+          className="w-full h-10 flex items-center gap-3 px-4 rounded-lg text-destructive hover:bg-destructive/10 transition-colors"
+        >
+          <LogOut className="w-4 h-4" />
+          <span className="text-sm font-bold">Logout</span>
+        </button>
+      </SidebarFooter>
+    </Sidebar>
+  );
+}
+
+export default function TransporterLayout({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -59,71 +150,10 @@ export default function TransporterLayout({ children }: { children: React.ReactN
     );
   }
 
-  const navItems = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Parties", href: "/parties", icon: Users },
-    { name: "Billing", href: "/billing", icon: CreditCard },
-    { name: "Profile", href: "/profile", icon: User },
-  ];
-
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-background">
-        <Sidebar className="border-r border-border/50 bg-card">
-          <SidebarHeader className="p-6">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-gradient-primary rounded-lg flex items-center justify-center shadow-md">
-                <Truck className="text-white w-5 h-5" />
-              </div>
-              <div className="flex flex-col">
-                <span className="font-headline font-bold text-lg leading-tight">TripBook</span>
-                <span className="text-[10px] uppercase tracking-widest text-primary font-bold">Pro SaaS</span>
-              </div>
-            </div>
-          </SidebarHeader>
-          <SidebarContent className="px-3">
-            <SidebarMenu>
-              {navItems.map((item) => (
-                <SidebarMenuItem key={item.name}>
-                  <SidebarMenuButton 
-                    asChild
-                    isActive={pathname === item.href}
-                    className={cn(
-                      "w-full h-11 px-4 flex items-center gap-3 rounded-lg transition-all duration-200",
-                      pathname === item.href 
-                        ? "bg-primary/10 text-primary font-bold" 
-                        : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-                    )}
-                  >
-                    <Link href={item.href}>
-                      <item.icon className={cn("w-5 h-5", pathname === item.href ? "text-primary" : "")} />
-                      <span>{item.name}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarContent>
-          <SidebarFooter className="p-4 border-t border-border/50">
-            <div className="flex items-center gap-3 mb-4 px-2">
-              <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center text-xs font-bold text-primary">
-                {profile?.ownerName?.charAt(0) || 'U'}
-              </div>
-              <div className="flex flex-col min-w-0">
-                <span className="text-sm font-bold truncate">{profile?.companyName}</span>
-                <span className="text-[10px] text-muted-foreground truncate">{profile?.email}</span>
-              </div>
-            </div>
-            <button
-              onClick={logout}
-              className="w-full h-10 flex items-center gap-3 px-4 rounded-lg text-destructive hover:bg-destructive/10 transition-colors"
-            >
-              <LogOut className="w-4 h-4" />
-              <span className="text-sm font-bold">Logout</span>
-            </button>
-          </SidebarFooter>
-        </Sidebar>
-
+        <TransporterSidebar />
         <main className="flex-1 min-w-0 flex flex-col h-screen overflow-hidden">
           <MobileHeader />
           <div className="flex-1 overflow-y-auto scrollbar-hide">
