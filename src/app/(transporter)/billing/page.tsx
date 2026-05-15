@@ -1,9 +1,10 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, doc, runTransaction, serverTimestamp } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, runTransaction } from "firebase/firestore";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -39,7 +40,13 @@ export default function BillingPage() {
       setTrips([]);
       return;
     }
-    const tripsQuery = query(collection(db, "trips"), where("userId", "==", profile.uid), where("partyId", "==", selectedPartyId));
+    // Only fetch unbilled trips for invoice generation
+    const tripsQuery = query(
+      collection(db, "trips"), 
+      where("userId", "==", profile.uid), 
+      where("partyId", "==", selectedPartyId),
+      where("billed", "==", false)
+    );
     const unsubscribeTrips = onSnapshot(tripsQuery, (snapshot) => {
       setTrips(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
@@ -72,7 +79,7 @@ export default function BillingPage() {
 
         billNo = `BILL-${nextBillNo.toString().padStart(4, '0')}`;
         
-        // Mark trips as billed (optional logic, but good for tracking)
+        // Mark trips as billed
         selectedTripIds.forEach(id => {
           const tripRef = doc(db, "trips", id);
           transaction.update(tripRef, { billed: true, billNo });
@@ -81,7 +88,6 @@ export default function BillingPage() {
         transaction.update(counterRef, { lastBillNo: nextBillNo });
       });
 
-      // Prepare data for preview
       const queryParams = new URLSearchParams({
         billNo,
         partyId: selectedPartyId,
@@ -176,7 +182,7 @@ export default function BillingPage() {
               ) : trips.length === 0 ? (
                 <div className="h-64 flex flex-col items-center justify-center text-muted-foreground border-2 border-dashed border-border rounded-xl">
                   <AlertCircle className="w-12 h-12 mb-4 opacity-20" />
-                  <p className="font-bold">No trips found for this party.</p>
+                  <p className="font-bold">No unbilled trips found for this party.</p>
                 </div>
               ) : (
                 <Table>

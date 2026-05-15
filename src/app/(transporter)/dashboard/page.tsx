@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -8,10 +9,12 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
-import { AlertCircle, Plus, Edit, Trash2, FileText, Loader2, Sparkles, Search, TrendingUp, Users as UsersIcon, Wallet, ArrowUpRight, Truck } from "lucide-react";
+import { AlertCircle, Plus, Edit, Trash2, FileText, Loader2, Sparkles, Search, TrendingUp, Users as UsersIcon, Wallet, ArrowUpRight, Truck, Tag } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { 
   AlertDialog, 
   AlertDialogAction, 
@@ -50,6 +53,7 @@ export default function Dashboard() {
   const [tripToDelete, setTripToDelete] = useState<any>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all");
 
   const [formData, setFormData] = useState({
     date: "",
@@ -210,7 +214,7 @@ export default function Dashboard() {
     try {
       if (editingTrip) {
         const tripRef = doc(db, "trips", editingTrip.id);
-        await runTransaction(db, async (transaction) => {
+        runTransaction(db, async (transaction) => {
           transaction.update(tripRef, {
             ...formData,
             ...numericData,
@@ -230,7 +234,7 @@ export default function Dashboard() {
         const counterRef = doc(db, "counters", profile.uid);
         const newTripRef = doc(collection(db, "trips"));
         
-        await runTransaction(db, async (transaction) => {
+        runTransaction(db, async (transaction) => {
           const counterDoc = await transaction.get(counterRef);
           let nextLrNo = 1;
           if (counterDoc.exists()) {
@@ -253,6 +257,8 @@ export default function Dashboard() {
             partyAddress: selectedParty.address,
             partyMobile: selectedParty.mobile,
             lrNo,
+            billed: false,
+            billNo: "",
             createdAt: serverTimestamp()
           });
 
@@ -295,14 +301,9 @@ export default function Dashboard() {
 
   const handleDeleteTrip = async () => {
     if (!db || !tripToDelete) return;
-    try {
-      await deleteDoc(doc(db, "trips", tripToDelete.id));
-      toast({ title: "Deleted", description: `Trip ${tripToDelete.lrNo} record deleted.` });
-    } catch (error: any) {
-      toast({ title: "Error Deleting", description: error.message, variant: "destructive" });
-    } finally {
-      setTripToDelete(null);
-    }
+    deleteDoc(doc(db, "trips", tripToDelete.id));
+    toast({ title: "Deleted", description: `Trip ${tripToDelete.lrNo} record deleted.` });
+    setTripToDelete(null);
   };
 
   const handleEditTrip = (trip: any) => {
@@ -333,13 +334,20 @@ export default function Dashboard() {
 
   const filteredTrips = trips.filter(trip => {
     const queryStr = searchQuery.toLowerCase();
-    return (
+    const matchesSearch = (
       trip.lrNo?.toLowerCase().includes(queryStr) ||
       trip.partyName?.toLowerCase().includes(queryStr) ||
       trip.vehicleNo?.toLowerCase().includes(queryStr) ||
       trip.source?.toLowerCase().includes(queryStr) ||
-      trip.destination?.toLowerCase().includes(queryStr)
+      trip.destination?.toLowerCase().includes(queryStr) ||
+      trip.billNo?.toLowerCase().includes(queryStr)
     );
+
+    const matchesStatus = filterStatus === "all" 
+      ? true 
+      : filterStatus === "billed" ? trip.billed === true : trip.billed === false;
+
+    return matchesSearch && matchesStatus;
   });
 
   const COLORS = ['#5850EC', '#2563EB', '#10B981', '#F59E0B', '#EF4444'];
@@ -581,12 +589,21 @@ export default function Dashboard() {
 
       <Card className="bg-card border-border/50">
         <CardHeader className="p-4 md:p-6 border-b border-border/50">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <CardTitle className="text-xl">Recent Shipments</CardTitle>
-            <div className="relative w-full sm:w-80">
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+            <div className="space-y-4 w-full lg:w-auto">
+              <CardTitle className="text-xl">Shipment Registry</CardTitle>
+              <Tabs defaultValue="all" className="w-full sm:w-auto" onValueChange={setFilterStatus}>
+                <TabsList className="bg-secondary/50">
+                  <TabsTrigger value="all">All Trips</TabsTrigger>
+                  <TabsTrigger value="unbilled">Unbilled</TabsTrigger>
+                  <TabsTrigger value="billed">Billed</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+            <div className="relative w-full sm:w-96">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
               <Input 
-                placeholder="Search LR, Party, Vehicle or Route..." 
+                placeholder="Search LR, Party, Vehicle, Route or Bill..." 
                 className="pl-10 bg-secondary/30 h-10 border-border/50"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -604,7 +621,9 @@ export default function Dashboard() {
               <Table>
                 <TableHeader className="bg-secondary/30">
                   <TableRow>
+                    <TableHead className="font-bold">Status</TableHead>
                     <TableHead className="font-bold">LR No</TableHead>
+                    <TableHead className="font-bold">Bill No</TableHead>
                     <TableHead className="font-bold">Party</TableHead>
                     <TableHead className="font-bold">Vehicle</TableHead>
                     <TableHead className="font-bold">Route</TableHead>
@@ -615,7 +634,19 @@ export default function Dashboard() {
                 <TableBody>
                   {filteredTrips.map((trip) => (
                     <TableRow key={trip.id} className="hover:bg-secondary/20 group">
+                      <TableCell>
+                        {trip.billed ? (
+                          <Badge variant="default" className="bg-green-500/10 text-green-500 border-green-500/20 hover:bg-green-500/20 px-2 py-0 h-6">
+                            Billed
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-orange-500 border-orange-500/20 bg-orange-500/5 px-2 py-0 h-6">
+                            Unbilled
+                          </Badge>
+                        )}
+                      </TableCell>
                       <TableCell className="font-bold text-primary">{trip.lrNo}</TableCell>
+                      <TableCell className="font-mono text-[10px]">{trip.billNo || "—"}</TableCell>
                       <TableCell className="font-medium truncate max-w-[150px]">{trip.partyName}</TableCell>
                       <TableCell className="text-xs font-mono">{trip.vehicleNo}</TableCell>
                       <TableCell className="text-xs">{trip.source} → {trip.destination}</TableCell>
@@ -623,14 +654,16 @@ export default function Dashboard() {
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
                           <Link href={`/lr-receipt-preview?id=${trip.id}`}>
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-green-500">
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-green-500" title="View LR">
                               <FileText className="w-4 h-4" />
                             </Button>
                           </Link>
-                          <Button size="icon" variant="ghost" onClick={() => handleEditTrip(trip)} className="h-8 w-8 text-blue-500">
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button size="icon" variant="ghost" onClick={() => setTripToDelete(trip)} className="h-8 w-8 text-destructive">
+                          {!trip.billed && (
+                            <Button size="icon" variant="ghost" onClick={() => handleEditTrip(trip)} className="h-8 w-8 text-blue-500" title="Edit">
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                          )}
+                          <Button size="icon" variant="ghost" onClick={() => setTripToDelete(trip)} className="h-8 w-8 text-destructive" title="Delete">
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
