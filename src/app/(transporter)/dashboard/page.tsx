@@ -19,8 +19,7 @@ import { getTransporterTripAISuggestions } from "@/ai/flows/transporter-trip-ai-
 import { cn } from "@/lib/utils";
 
 export default function Dashboard() {
-  const { profile } = useAuth();
-  const db = useFirestore();
+  const { profile, db } = useAuth();
   const { toast } = useToast();
   const [trips, setTrips] = useState<any[]>([]);
   const [parties, setParties] = useState<any[]>([]);
@@ -294,7 +293,6 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
-      {/* Welcome & Banner */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-headline font-bold">Welcome, {profile?.companyName}</h1>
@@ -341,6 +339,21 @@ export default function Dashboard() {
                 <div className="space-y-2">
                   <Label>Vehicle Type</Label>
                   <Input placeholder="Open Truck / 14ft" value={formData.vehicleType} onChange={e => setFormData({ ...formData, vehicleType: e.target.value })} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Size L (ft)</Label>
+                  <Input type="number" placeholder="L" value={formData.sizeL} onChange={e => setFormData({ ...formData, sizeL: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Size W (ft)</Label>
+                  <Input type="number" placeholder="W" value={formData.sizeW} onChange={e => setFormData({ ...formData, sizeW: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Size H (ft)</Label>
+                  <Input type="number" placeholder="H" value={formData.sizeH} onChange={e => setFormData({ ...formData, sizeH: e.target.value })} />
                 </div>
               </div>
 
@@ -414,7 +427,6 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Live Calculation Card */}
               <Card className="bg-primary/5 border-primary/20">
                 <CardContent className="pt-6 space-y-2">
                   <div className="flex justify-between text-sm">
@@ -477,7 +489,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {[
           { label: "Total Trips", value: stats.totalTrips, sub: "Historical load count", color: "text-primary" },
@@ -497,7 +508,6 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Trips Table */}
       <Card className="bg-card border-border/50">
         <CardHeader>
           <div className="flex items-center justify-between">
