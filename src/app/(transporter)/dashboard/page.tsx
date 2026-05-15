@@ -44,6 +44,7 @@ import {
 export default function Dashboard() {
   const { profile, db } = useAuth();
   const { toast } = useToast();
+  
   const [trips, setTrips] = useState<any[]>([]);
   const [parties, setParties] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -342,9 +343,11 @@ export default function Dashboard() {
       trip.billNo?.toLowerCase().includes(queryStr)
     );
 
+    // Robust billed check handling older records
+    const isBilled = trip.billed || trip.isBilled || false;
     const matchesStatus = filterStatus === "all" 
       ? true 
-      : filterStatus === "billed" ? trip.billed === true : trip.billed === false;
+      : filterStatus === "billed" ? isBilled === true : isBilled === false;
 
     return matchesSearch && matchesStatus;
   });
@@ -631,55 +634,58 @@ export default function Dashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredTrips.map((trip) => (
-                    <TableRow key={trip.id} className="hover:bg-secondary/20 group">
-                      <TableCell>
-                        {trip.billed ? (
-                          <Badge variant="default" className="bg-green-500/10 text-green-500 border-green-500/20 hover:bg-green-500/20 px-2 py-0 h-6">
-                            Billed
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-orange-500 border-orange-500/20 bg-orange-500/5 px-2 py-0 h-6">
-                            Unbilled
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="font-bold text-primary">{trip.lrNo}</TableCell>
-                      <TableCell className="font-mono text-[10px]">{trip.billNo || "—"}</TableCell>
-                      <TableCell className="font-medium truncate max-w-[150px]">{trip.partyName}</TableCell>
-                      <TableCell className="text-xs font-mono">{trip.vehicleNo}</TableCell>
-                      <TableCell className="text-xs">{trip.source} → {trip.destination}</TableCell>
-                      <TableCell className="text-right font-bold">₹{Number(trip.totalAmount || 0).toLocaleString()}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Link href={`/lr-receipt-preview?id=${trip.id}`}>
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-green-500" title="View LR">
-                              <FileText className="w-4 h-4" />
-                            </Button>
-                          </Link>
-                          
-                          {trip.billed && trip.invoiceId && (
-                            <Link href={`/invoice-preview?id=${trip.invoiceId}`}>
-                              <Button size="icon" variant="ghost" className="h-8 w-8 text-accent" title="View Bill">
-                                <Receipt className="w-4 h-4" />
+                  {filteredTrips.map((trip) => {
+                    const isBilled = trip.billed || trip.isBilled || false;
+                    return (
+                      <TableRow key={trip.id} className="hover:bg-secondary/20 group">
+                        <TableCell>
+                          {isBilled ? (
+                            <Badge variant="default" className="bg-green-500/10 text-green-500 border-green-500/20 hover:bg-green-500/20 px-2 py-0 h-6">
+                              Billed
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-orange-500 border-orange-500/20 bg-orange-500/5 px-2 py-0 h-6">
+                              Unbilled
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="font-bold text-primary">{trip.lrNo}</TableCell>
+                        <TableCell className="font-mono text-[10px]">{trip.billNo || "—"}</TableCell>
+                        <TableCell className="font-medium truncate max-w-[150px]">{trip.partyName}</TableCell>
+                        <TableCell className="text-xs font-mono">{trip.vehicleNo}</TableCell>
+                        <TableCell className="text-xs">{trip.source} → {trip.destination}</TableCell>
+                        <TableCell className="text-right font-bold">₹{Number(trip.totalAmount || 0).toLocaleString()}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Link href={`/lr-receipt-preview?id=${trip.id}`}>
+                              <Button size="icon" variant="ghost" className="h-8 w-8 text-green-500" title="View LR">
+                                <FileText className="w-4 h-4" />
                               </Button>
                             </Link>
-                          )}
+                            
+                            {isBilled && trip.invoiceId && (
+                              <Link href={`/invoice-preview?id=${trip.invoiceId}`}>
+                                <Button size="icon" variant="ghost" className="h-8 w-8 text-accent" title="View Bill">
+                                  <Receipt className="w-4 h-4" />
+                                </Button>
+                              </Link>
+                            )}
 
-                          {!trip.billed && (
-                            <>
-                              <Button size="icon" variant="ghost" onClick={() => handleEditTrip(trip)} className="h-8 w-8 text-blue-500" title="Edit">
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button size="icon" variant="ghost" onClick={() => setTripToDelete(trip)} className="h-8 w-8 text-destructive" title="Delete">
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                            {!isBilled && (
+                              <>
+                                <Button size="icon" variant="ghost" onClick={() => handleEditTrip(trip)} className="h-8 w-8 text-blue-500" title="Edit">
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button size="icon" variant="ghost" onClick={() => setTripToDelete(trip)} className="h-8 w-8 text-destructive" title="Delete">
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
