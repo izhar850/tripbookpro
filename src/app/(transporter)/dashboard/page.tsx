@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { db } from "@/lib/firebase";
+import { db } from "@/firebase";
 import { collection, query, where, onSnapshot, doc, deleteDoc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -170,6 +170,8 @@ export default function Dashboard() {
           transaction.update(tripRef, {
             ...formData,
             ...numericData,
+            companyName: profile.companyName,
+            companyAddress: profile.address,
             partyName: selectedParty.partyName,
             partyGst: selectedParty.gstNo,
             partyAddress: selectedParty.address,
@@ -199,6 +201,7 @@ export default function Dashboard() {
             ...numericData,
             userId: profile.uid,
             companyName: profile.companyName,
+            companyAddress: profile.address,
             ownerName: profile.ownerName,
             partyName: selectedParty.partyName,
             partyGst: selectedParty.gstNo,
@@ -535,7 +538,7 @@ export default function Dashboard() {
                     <TableCell className="text-sm">{trip.source} → {trip.destination}</TableCell>
                     <TableCell className="text-right font-bold">₹{Number(trip.totalAmount || 0).toLocaleString()}</TableCell>
                     <TableCell className="text-right">
-                      <Badge variant={trip.balance > 0 ? "destructive" : "secondary"}>
+                      <Badge variant={Number(trip.balance || 0) > 0 ? "destructive" : "secondary"}>
                         ₹{Number(trip.balance || 0).toLocaleString()}
                       </Badge>
                     </TableCell>
