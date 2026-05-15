@@ -81,7 +81,6 @@ function LRReceiptContent() {
     if (!receiptRef.current || !trip) return;
     setDownloading(true);
     
-    // Import html2pdf dynamically
     const html2pdf = (await import('html2pdf.js')).default;
     
     const element = receiptRef.current;
@@ -89,7 +88,12 @@ function LRReceiptContent() {
       margin: 10,
       filename: `${trip.lrNo || 'LR'}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, logging: false },
+      html2canvas: { 
+        scale: 2, 
+        useCORS: true, 
+        logging: false,
+        backgroundColor: '#ffffff'
+      },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
 
@@ -103,7 +107,7 @@ function LRReceiptContent() {
   };
 
   if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>;
-  if (!trip) return <div>Trip not found.</div>;
+  if (!trip) return <div className="p-8 text-center text-foreground">Trip data not found. <Button variant="link" onClick={() => router.back()}>Go Back</Button></div>;
 
   const companyName = profile?.companyName || trip.companyName;
   const companyAddress = profile?.address || trip.companyAddress;
@@ -113,29 +117,29 @@ function LRReceiptContent() {
   const totalAmount = Number(trip.totalAmount || 0);
 
   return (
-    <div className="min-h-screen bg-slate-900 text-black p-4 md:p-8 font-body">
-      <div ref={receiptRef} className="max-w-4xl mx-auto bg-white border-2 border-black p-6 shadow-2xl">
-        <div className="flex justify-between items-start border-b-2 border-black pb-4 mb-4">
+    <div className="min-h-screen bg-slate-900 p-4 md:p-8 font-body">
+      <div ref={receiptRef} className="max-w-4xl mx-auto !bg-white !text-black border-2 border-black p-6 shadow-2xl">
+        <div className="flex justify-between items-start border-b-2 border-black pb-4 mb-4 !text-black">
           <div className="flex gap-4">
-             <Truck className="w-12 h-12" />
+             <Truck className="w-12 h-12 !text-black" />
              <div>
-                <h1 className="text-3xl font-bold uppercase leading-tight">{companyName}</h1>
-                <p className="text-sm font-bold">Logistics & Transportation Services</p>
-                <p className="text-xs whitespace-pre-wrap max-w-sm mt-1">{companyAddress}</p>
-                <div className="mt-2 text-[10px] font-bold space-y-0.5">
+                <h1 className="text-3xl font-bold uppercase leading-tight !text-black">{companyName}</h1>
+                <p className="text-sm font-bold !text-black">Logistics & Transportation Services</p>
+                <p className="text-xs whitespace-pre-wrap max-w-sm mt-1 !text-black">{companyAddress}</p>
+                <div className="mt-2 text-[10px] font-bold space-y-0.5 !text-black">
                    <p>GSTIN: {companyGst}</p>
                    <p>MOB: {companyMobile}</p>
                 </div>
              </div>
           </div>
-          <div className="text-right">
-            <div className="text-xl font-bold border-2 border-black px-4 py-1 mb-2">LORRY RECEIPT</div>
+          <div className="text-right !text-black">
+            <div className="text-xl font-bold border-2 border-black px-4 py-1 mb-2 !text-black">LORRY RECEIPT</div>
             <p className="text-sm font-bold">LR NO: <span className="text-lg">{trip.lrNo}</span></p>
             <p className="text-sm">DATE: {trip.date}</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 border-b-2 border-black mb-4 py-2 px-4 bg-gray-50 font-bold">
+        <div className="grid grid-cols-2 border-b-2 border-black mb-4 py-2 px-4 bg-gray-50 font-bold !text-black">
            <div className="flex items-center gap-2">
               <span className="text-xs uppercase">FROM:</span>
               <span>{trip.source}</span>
@@ -146,14 +150,14 @@ function LRReceiptContent() {
            </div>
         </div>
 
-        <div className="grid grid-cols-2 border-b-2 border-black mb-4">
-          <div className="border-r-2 border-black p-4">
+        <div className="grid grid-cols-2 border-b-2 border-black mb-4 !text-black">
+          <div className="border-r-2 border-black p-4 !text-black">
             <h3 className="text-xs font-bold uppercase mb-2">Consignor:</h3>
             <p className="font-bold">{companyName}</p>
             <p className="text-sm">{companyAddress}</p>
             <p className="text-sm font-bold mt-2">GSTIN: {companyGst}</p>
           </div>
-          <div className="p-4">
+          <div className="p-4 !text-black">
             <h3 className="text-xs font-bold uppercase mb-2">Consignee:</h3>
             <p className="font-bold">{trip.partyName}</p>
             <p className="text-sm">{trip.partyAddress}</p>
@@ -161,10 +165,10 @@ function LRReceiptContent() {
           </div>
         </div>
 
-        <div className="mb-4">
-          <table className="w-full border-2 border-black">
+        <div className="mb-4 !text-black">
+          <table className="w-full border-2 border-black !text-black">
             <thead>
-              <tr className="bg-gray-100 border-b-2 border-black text-[10px]">
+              <tr className="bg-gray-100 border-b-2 border-black text-[10px] text-black">
                 <th className="border-r-2 border-black p-2">PKGS</th>
                 <th className="border-r-2 border-black p-2">DESCRIPTION OF GOODS</th>
                 <th className="border-r-2 border-black p-2">VEHICLE SIZE</th>
@@ -173,7 +177,7 @@ function LRReceiptContent() {
                 <th className="p-2">RATE/QTL</th>
               </tr>
             </thead>
-            <tbody className="h-32 align-top text-xs">
+            <tbody className="h-32 align-top text-xs !text-black">
               <tr className="border-b-2 border-black">
                 <td className="border-r-2 border-black p-4 text-center font-bold">{trip.packages}</td>
                 <td className="border-r-2 border-black p-4 uppercase">{trip.goodsDescription}</td>
@@ -188,16 +192,16 @@ function LRReceiptContent() {
           </table>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
-          <div className="col-span-2 border-2 border-black p-4">
-            <div className="p-2 bg-gray-50 border border-black/10 rounded mb-4">
+        <div className="grid grid-cols-3 gap-4 !text-black">
+          <div className="col-span-2 border-2 border-black p-4 !text-black">
+            <div className="p-2 bg-gray-50 border border-black/10 rounded mb-4 !text-black">
                <span className="text-[10px] font-bold block mb-1 underline">AMOUNT IN WORDS:</span>
-               <p className="text-xs font-bold uppercase italic">Rupees {numberToWords(totalAmount)} Only</p>
+               <p className="text-xs font-bold uppercase italic !text-black">Rupees {numberToWords(totalAmount)} Only</p>
             </div>
 
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 !text-black">
               <span className="text-xs font-bold underline">GST PAYABLE BY:</span>
-              <div className="flex gap-4 text-[10px] uppercase font-bold">
+              <div className="flex gap-4 text-[10px] uppercase font-bold !text-black">
                  <div className="flex items-center gap-1">
                     <div className="w-4 h-4 border border-black flex items-center justify-center">
                        {trip.gstPayBy === 'consigner' && <span>✓</span>}
@@ -219,7 +223,7 @@ function LRReceiptContent() {
               </div>
             </div>
           </div>
-          <div className="border-2 border-black divide-y-2 divide-black text-xs">
+          <div className="border-2 border-black divide-y-2 divide-black text-xs !text-black">
              <div className="p-2 flex justify-between">
                 <span>TOTAL FREIGHT:</span>
                 <span className="font-bold">₹{Number(trip.totalFreight || 0).toFixed(2)}</span>
@@ -235,7 +239,7 @@ function LRReceiptContent() {
           </div>
         </div>
 
-        <div className="mt-8 flex justify-between items-end text-[10px] font-bold uppercase">
+        <div className="mt-8 flex justify-between items-end text-[10px] font-bold uppercase !text-black">
           <div className="text-center">
              <div className="w-40 border-b border-black mb-1" />
              <p>Consignee Signature</p>
