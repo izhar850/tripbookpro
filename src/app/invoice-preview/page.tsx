@@ -6,7 +6,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
-import { Printer, ArrowLeft, Loader2, FileDown } from "lucide-react";
+import { Printer, ArrowLeft, Loader2 } from "lucide-react";
 
 // Helper for number to words (Indian System)
 function numberToWords(num: number): string {
@@ -55,7 +55,6 @@ function InvoiceContent() {
   
   const [invoice, setInvoice] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -78,35 +77,6 @@ function InvoiceContent() {
     fetchData();
   }, [invoiceId]);
 
-  const handleDownloadPdf = async () => {
-    if (!invoiceRef.current || !invoice) return;
-    setDownloading(true);
-    
-    const html2pdf = (await import('html2pdf.js')).default;
-    
-    const element = invoiceRef.current;
-    const opt = {
-      margin: 10,
-      filename: `${invoice.billNo || 'Invoice'}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { 
-        scale: 2, 
-        useCORS: true, 
-        logging: false,
-        backgroundColor: '#ffffff'
-      },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
-
-    try {
-      await html2pdf().from(element).set(opt).save();
-    } catch (error) {
-      console.error("PDF generation failed:", error);
-    } finally {
-      setDownloading(false);
-    }
-  };
-
   if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>;
   if (!invoice) return <div className="p-8 text-center text-foreground">Invoice data not found. <Button variant="link" onClick={() => router.back()}>Go Back</Button></div>;
 
@@ -115,8 +85,14 @@ function InvoiceContent() {
   return (
     <div className="min-h-screen bg-slate-900 p-4 md:p-8 font-body">
       <div ref={invoiceRef} className="max-w-5xl mx-auto !bg-white !text-black border-2 border-black p-8 shadow-2xl printable-area">
-        {/* Force colors for PDF generation */}
+        {/* Force colors for print generation */}
         <style dangerouslySetInnerHTML={{ __html: `
+          @media print {
+            .printable-area { background-color: white !important; color: black !important; }
+            .printable-area * { color: black !important; border-color: black !important; }
+            .printable-area .bg-black { background-color: black !important; color: white !important; }
+            .printable-area .bg-black * { color: white !important; }
+          }
           .printable-area { background-color: white !important; color: black !important; }
           .printable-area * { color: black !important; border-color: black !important; }
           .printable-area .bg-black { background-color: black !important; color: white !important; }
@@ -219,10 +195,6 @@ function InvoiceContent() {
       <div className="fixed bottom-8 left-1/2 -translate-x-1/2 flex gap-4 no-print">
          <Button variant="outline" onClick={() => router.back()} className="bg-white border-black text-black hover:bg-gray-100 font-bold h-12 shadow-xl">
             <ArrowLeft className="w-5 h-5 mr-2" /> Back
-         </Button>
-         <Button onClick={handleDownloadPdf} disabled={downloading} className="bg-primary text-white hover:opacity-90 font-bold h-12 shadow-xl">
-            {downloading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <FileDown className="w-5 h-5 mr-2" />}
-            Download PDF
          </Button>
          <Button onClick={() => window.print()} className="bg-black text-white hover:bg-gray-800 font-bold h-12 shadow-xl">
             <Printer className="w-5 h-5 mr-2" /> Print Invoice
