@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useAuth } from "@/hooks/use-auth";
@@ -84,20 +85,21 @@ export default function TransporterLayout({ children }: { children: React.ReactN
             <SidebarMenu>
               {navItems.map((item) => (
                 <SidebarMenuItem key={item.name}>
-                  <Link href={item.href} passHref legacyBehavior>
-                    <SidebarMenuButton 
-                      isActive={pathname === item.href}
-                      className={cn(
-                        "w-full h-11 px-4 flex items-center gap-3 rounded-lg transition-all duration-200",
-                        pathname === item.href 
-                          ? "bg-primary/10 text-primary font-bold" 
-                          : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-                      )}
-                    >
+                  <SidebarMenuButton 
+                    asChild
+                    isActive={pathname === item.href}
+                    className={cn(
+                      "w-full h-11 px-4 flex items-center gap-3 rounded-lg transition-all duration-200",
+                      pathname === item.href 
+                        ? "bg-primary/10 text-primary font-bold" 
+                        : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    )}
+                  >
+                    <Link href={item.href}>
                       <item.icon className={cn("w-5 h-5", pathname === item.href ? "text-primary" : "")} />
                       <span>{item.name}</span>
-                    </SidebarMenuButton>
-                  </Link>
+                    </Link>
+                  </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
