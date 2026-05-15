@@ -35,7 +35,8 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
+      const normalizedEmail = formData.email.trim().toLowerCase();
+      const userCredential = await signInWithEmailAndPassword(auth, normalizedEmail, formData.password);
       const userDoc = await getDoc(doc(db, "users", userCredential.user.uid));
       
       if (userDoc.exists()) {
@@ -70,9 +71,11 @@ export default function LoginPage() {
 
     setResetLoading(true);
     try {
+      const normalizedEmail = resetEmail.trim().toLowerCase();
+      
       // Explicitly check if the user exists in Firestore first
       const usersRef = collection(db, "users");
-      const q = query(usersRef, where("email", "==", resetEmail.trim()));
+      const q = query(usersRef, where("email", "==", normalizedEmail));
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
@@ -85,13 +88,13 @@ export default function LoginPage() {
         return;
       }
 
-      await sendPasswordResetEmail(auth, resetEmail.trim());
+      await sendPasswordResetEmail(auth, normalizedEmail);
       setIsResetOpen(false);
       setResetEmail("");
       
       toast({
         title: "Success",
-        description: "Password reset email sent successfully. Please check your inbox.",
+        description: "Password reset email sent successfully. Please check your inbox and spam folder.",
       });
     } catch (error: any) {
       let message = "Could not send reset email. Please try again.";

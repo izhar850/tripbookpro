@@ -28,14 +28,17 @@ export default function SignupPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+      // Normalize email to lowercase
+      const normalizedEmail = formData.email.trim().toLowerCase();
+      
+      const userCredential = await createUserWithEmailAndPassword(auth, normalizedEmail, formData.password);
       const uid = userCredential.user.uid;
 
       await setDoc(doc(db, "users", uid), {
         uid,
         companyName: formData.companyName,
         ownerName: formData.ownerName,
-        email: formData.email,
+        email: normalizedEmail,
         role: "transporter",
         mobile: "",
         officePhone: "",
