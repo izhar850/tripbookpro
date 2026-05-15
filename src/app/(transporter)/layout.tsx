@@ -14,12 +14,13 @@ import {
   SidebarMenuButton,
   SidebarTrigger
 } from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
 import { Loader2, LayoutDashboard, Users, CreditCard, User, LogOut, Truck, Menu } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
-export default function TransporterLayout({ children }: { children: React.Node }) {
+export default function TransporterLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -111,7 +112,7 @@ export default function TransporterLayout({ children }: { children: React.Node }
               </div>
               <span className="font-headline font-bold text-sm tracking-tight">TripBook Pro</span>
             </div>
-            <SidebarTrigger>
+            <SidebarTrigger asChild>
               <Button size="icon" variant="ghost" className="h-9 w-9">
                 <Menu className="h-5 w-5" />
               </Button>
