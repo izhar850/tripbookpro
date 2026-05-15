@@ -13,20 +13,36 @@ function LRReceiptContent() {
   const db = useFirestore();
   const id = searchParams.get("id");
   const [trip, setTrip] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!id || !db) return;
-    const fetchTrip = async () => {
+    const fetchData = async () => {
       const tripDoc = await getDoc(doc(db, "trips", id));
-      if (tripDoc.exists()) setTrip(tripDoc.data());
+      if (tripDoc.exists()) {
+        const tData = tripDoc.data();
+        setTrip({ id: tripDoc.id, ...tData });
+        
+        // Fetch the transporter's profile to get the latest full address and GST
+        const userDoc = await getDoc(doc(db, "users", tData.userId));
+        if (userDoc.exists()) {
+          setProfile(userDoc.data());
+        }
+      }
       setLoading(false);
     };
-    fetchTrip();
+    fetchData();
   }, [id, db]);
 
   if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin" /></div>;
   if (!trip) return <div>Trip not found.</div>;
+
+  // Use profile data if available, otherwise fallback to trip data
+  const companyName = profile?.companyName || trip.companyName;
+  const companyAddress = profile?.address || trip.companyAddress || trip.source;
+  const companyGst = profile?.gstNo || trip.companyGst || "N/A";
+  const companyMobile = profile?.mobile || trip.companyMobile || "N/A";
 
   return (
     <div className="min-h-screen bg-white text-black p-4 md:p-8 font-body">
@@ -36,10 +52,13 @@ function LRReceiptContent() {
           <div className="flex gap-4">
              <Truck className="w-12 h-12" />
              <div>
-                <h1 className="text-3xl font-bold uppercase">{trip.companyName}</h1>
+                <h1 className="text-3xl font-bold uppercase leading-tight">{companyName}</h1>
                 <p className="text-sm font-bold">Logistics & Transportation Services</p>
-                <p className="text-xs whitespace-pre-wrap max-w-sm">{trip.companyAddress || trip.source}</p>
-                <p className="text-xs font-bold mt-1">GSTIN: {trip.partyGst || 'N/A'}</p>
+                <p className="text-xs whitespace-pre-wrap max-w-sm mt-1">{companyAddress}</p>
+                <div className="mt-2 text-[10px] font-bold space-y-0.5">
+                   <p>GSTIN: {companyGst}</p>
+                   <p>MOB: {companyMobile}</p>
+                </div>
              </div>
           </div>
           <div className="text-right">
@@ -53,14 +72,14 @@ function LRReceiptContent() {
         <div className="grid grid-cols-2 border-b-2 border-black mb-4">
           <div className="border-r-2 border-black p-4">
             <h3 className="text-xs font-bold uppercase mb-2">Consignor:</h3>
-            <p className="font-bold">{trip.companyName}</p>
-            <p className="text-sm whitespace-pre-wrap">Address: {trip.companyAddress || trip.source}</p>
+            <p className="font-bold">{companyName}</p>
+            <p className="text-sm whitespace-pre-wrap">Address: {companyAddress}</p>
           </div>
           <div className="p-4">
             <h3 className="text-xs font-bold uppercase mb-2">Consignee:</h3>
             <p className="font-bold">{trip.partyName}</p>
             <p className="text-sm whitespace-pre-wrap">{trip.partyAddress}</p>
-            <p className="text-sm font-bold mt-2">GST: {trip.partyGst}</p>
+            <p className="text-sm font-bold mt-2">GST: {trip.partyGst || 'UNREGISTERED'}</p>
           </div>
         </div>
 
@@ -130,7 +149,7 @@ function LRReceiptContent() {
              <p className="text-[10px] font-bold">CONSIGNEE SIGNATURE</p>
           </div>
           <div className="text-right text-xs">
-             <p className="font-bold">For {trip.companyName}</p>
+             <p className="font-bold">For {companyName}</p>
              <div className="h-16" />
              <p className="font-bold uppercase">Authorized Signatory</p>
           </div>
