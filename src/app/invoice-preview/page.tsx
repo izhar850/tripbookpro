@@ -12,41 +12,44 @@ import { Printer, ArrowLeft, Loader2 } from "lucide-react";
  * Converts a numeric amount into words (Indian System)
  */
 function numberToWords(num: number): string {
-  if (isNaN(num) || num === null || num === 0) return 'Zero';
+  const n = Math.floor(Math.abs(num));
+  if (n === 0) return 'Zero';
   
   const single = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
   const double = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
   const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
 
-  function convert(n: number): string {
-    if (n < 10) return single[n];
-    if (n < 20) return double[n - 10];
-    if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 !== 0 ? ' ' + single[n % 10] : '');
-    if (n < 1000) return single[Math.floor(n / 100)] + ' Hundred' + (n % 100 !== 0 ? ' and ' + convert(n % 100) : '');
+  function convert(val: number): string {
+    if (val < 10) return single[val];
+    if (val < 20) return double[val - 10];
+    if (val < 100) return tens[Math.floor(val / 10)] + (val % 10 !== 0 ? ' ' + single[val % 10] : '');
+    if (val < 1000) return single[Math.floor(val / 100)] + ' Hundred' + (val % 100 !== 0 ? ' and ' + convert(val % 100) : '');
     return '';
   }
 
-  function handleLarge(n: number): string {
+  function handleLarge(val: number): string {
     let res = '';
-    if (n >= 10000000) {
-      res += convert(Math.floor(n / 10000000)) + ' Crore ';
-      n %= 10000000;
+    let temp = val;
+    
+    if (temp >= 10000000) {
+      res += convert(Math.floor(temp / 10000000)) + ' Crore ';
+      temp %= 10000000;
     }
-    if (n >= 100000) {
-      res += convert(Math.floor(n / 100000)) + ' Lakh ';
-      n %= 100000;
+    if (temp >= 100000) {
+      res += convert(Math.floor(temp / 100000)) + ' Lakh ';
+      temp %= 100000;
     }
-    if (n >= 1000) {
-      res += convert(Math.floor(n / 1000)) + ' Thousand ';
-      n %= 1000;
+    if (temp >= 1000) {
+      res += convert(Math.floor(temp / 1000)) + ' Thousand ';
+      temp %= 1000;
     }
-    if (n > 0) {
-      res += convert(n);
+    if (temp > 0) {
+      res += convert(temp);
     }
     return res.trim();
   }
 
-  return handleLarge(Math.floor(num));
+  return handleLarge(n);
 }
 
 function InvoiceContent() {
