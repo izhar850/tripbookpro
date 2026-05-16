@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, CreditCard, Loader2, FileCheck, Users, ArrowRight, ReceiptText, Download } from "lucide-react";
+import { AlertCircle, CreditCard, Loader2, FileCheck, Users, Download, ReceiptText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -84,7 +84,7 @@ export default function BillingPage() {
   }, [parties, trips]);
 
   const currentTrips = useMemo(() => {
-    if (!selectedPartyId) return trips;
+    if (!selectedPartyId || selectedPartyId === "none") return trips;
     return trips.filter(t => t.partyId === selectedPartyId);
   }, [trips, selectedPartyId]);
 
@@ -101,10 +101,13 @@ export default function BillingPage() {
   const invoiceTotal = selectedTripsData.reduce((acc, t) => acc + (Number(t.totalAmount) || 0), 0);
 
   const handleExportCSV = () => {
-    if (selectedTripIds.length === 0) {
+    // If some are selected, export those. Otherwise export all visible in current list.
+    const dataToExport = selectedTripIds.length > 0 ? selectedTripsData : currentTrips;
+
+    if (dataToExport.length === 0) {
       toast({
-        title: "No Selection",
-        description: "Please select at least one trip record to export.",
+        title: "No Data",
+        description: "There are no trip records available to export.",
         variant: "destructive"
       });
       return;
@@ -118,7 +121,7 @@ export default function BillingPage() {
         "Total Freight", "Advance", "Balance", "GST Pay By"
       ];
 
-      const csvRows = selectedTripsData.map(t => [
+      const csvRows = dataToExport.map(t => [
         t.billNo || "",
         t.lrNo || "",
         t.date || "",
@@ -153,7 +156,7 @@ export default function BillingPage() {
 
       toast({
         title: "Success",
-        description: "Billing data exported successfully."
+        description: `Exported ${dataToExport.length} records successfully.`
       });
     } catch (error) {
       toast({
@@ -260,8 +263,8 @@ export default function BillingPage() {
           <Button 
             variant="outline" 
             onClick={handleExportCSV} 
-            disabled={selectedTripIds.length === 0 || exporting}
-            className="flex-1 md:flex-none h-11 border-border/50 font-bold"
+            disabled={currentTrips.length === 0 || exporting}
+            className="flex-1 md:flex-none h-11 border-border/50 font-bold bg-secondary/50 hover:bg-secondary"
           >
             {exporting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Download className="w-4 h-4 mr-2" />}
             Export CSV
@@ -276,7 +279,7 @@ export default function BillingPage() {
               <CardTitle className="text-lg flex items-center gap-2">
                 <Users className="w-5 h-5 text-primary" /> Party Filter
               </CardTitle>
-              <CardDescription>Filter unbilled or billed trips by client</CardDescription>
+              <CardDescription>Filter records by client</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <Select value={selectedPartyId} onValueChange={(val) => { setSelectedPartyId(val); setSelectedTripIds([]); }}>
@@ -317,7 +320,7 @@ export default function BillingPage() {
             </CardContent>
           </Card>
 
-          {viewStatus === "unbilled" && partiesWithTrips.length > 0 && !selectedPartyId && (
+          {viewStatus === "unbilled" && partiesWithTrips.length > 0 && (!selectedPartyId || selectedPartyId === "none") && (
             <div className="bg-blue-500/5 border border-blue-500/20 p-6 rounded-2xl flex items-start gap-4 animate-in fade-in slide-in-from-left-4">
               <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
                 <ReceiptText className="w-5 h-5 text-blue-500" />
@@ -325,7 +328,7 @@ export default function BillingPage() {
               <div className="space-y-1">
                 <h4 className="font-bold text-blue-500">Pending Actions</h4>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  You have shipments waiting for invoices. Select a party from the list to process their shipments into a bill.
+                  Select a party from the list to process their shipments into a single tax invoice.
                 </p>
               </div>
             </div>
@@ -336,14 +339,19 @@ export default function BillingPage() {
           <Tabs value={viewStatus} onValueChange={(v: any) => { setViewStatus(v); setSelectedTripIds([]); }} className="w-full">
             <TabsList className="bg-secondary/50 w-full sm:w-auto">
               <TabsTrigger value="unbilled" className="flex-1 sm:flex-none">Pending Billing</TabsTrigger>
-              <TabsTrigger value="billed" className="flex-1 sm:flex-none">Processed History</TabsTrigger>
+              <TabsTrigger value="billed" className="flex-1 sm:flex-none">Billing History</TabsTrigger>
             </TabsList>
           </Tabs>
 
           <Card className="bg-card border-border/50 min-h-[400px]">
             <CardHeader className="border-b border-border/50 pb-4">
-              <CardTitle className="text-lg">
-                {viewStatus === "unbilled" ? "Unbilled Shipments" : "Billing History"}
+              <CardTitle className="text-lg flex justify-between items-center">
+                <span>{viewStatus === "unbilled" ? "Unbilled Shipments" : "Processed Records"}</span>
+                {selectedTripIds.length > 0 && (
+                  <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded">
+                    {selectedTripIds.length} Selected
+                  </span>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
@@ -358,7 +366,18 @@ export default function BillingPage() {
                   <Table>
                     <TableHeader className="bg-secondary/30">
                       <TableRow>
-                        <TableHead className="w-[60px]"></TableHead>
+                        <TableHead className="w-[60px]">
+                          <Checkbox 
+                            checked={selectedTripIds.length === currentTrips.length && currentTrips.length > 0}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedTripIds(currentTrips.map(t => t.id));
+                              } else {
+                                setSelectedTripIds([]);
+                              }
+                            }}
+                          />
+                        </TableHead>
                         {viewStatus === "billed" && <TableHead className="font-bold">Bill No</TableHead>}
                         <TableHead className="font-bold">LR No</TableHead>
                         <TableHead className="font-bold">Party</TableHead>
@@ -368,7 +387,11 @@ export default function BillingPage() {
                     </TableHeader>
                     <TableBody>
                       {currentTrips.map((trip) => (
-                        <TableRow key={trip.id} className="hover:bg-secondary/20 transition-colors cursor-pointer" onClick={() => toggleTripSelection(trip.id)}>
+                        <TableRow 
+                          key={trip.id} 
+                          className="hover:bg-secondary/20 transition-colors cursor-pointer" 
+                          onClick={() => toggleTripSelection(trip.id)}
+                        >
                           <TableCell onClick={(e) => e.stopPropagation()}>
                             <Checkbox 
                               checked={selectedTripIds.includes(trip.id)} 
