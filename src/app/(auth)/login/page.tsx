@@ -118,13 +118,14 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-background relative">
-       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none opacity-20">
-        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-primary rounded-full blur-[120px]" />
-        <div className="absolute -bottom-[10%] -right-[10%] w-[40%] h-[40%] bg-accent rounded-full blur-[120px]" />
-      </div>
+    <div 
+      className="min-h-screen flex items-center justify-center p-6 relative bg-cover bg-center bg-no-repeat"
+      style={{ backgroundImage: 'url(/images/bg-transport.png)' }}
+    >
+      {/* Dark overlay without blur so the background is crisp */}
+      <div className="absolute inset-0 bg-background/60 z-0"></div>
 
-      <Card className="w-full max-w-md bg-card/80 backdrop-blur-md border-border/50 relative">
+      <Card className="w-full max-w-md bg-card/60 backdrop-blur-lg border-border/30 shadow-2xl relative z-10">
         <CardHeader className="text-center pb-2">
           <div className="mx-auto w-12 h-12 bg-gradient-primary rounded-xl flex items-center justify-center mb-4 shadow-lg">
             <Truck className="text-white w-7 h-7" />
