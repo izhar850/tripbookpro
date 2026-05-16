@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { db } from "@/lib/firebase";
+import { useFirestore } from "@/firebase";
 import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,9 +10,12 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@
 import { Loader2, ShieldCheck, Truck, Users, PieChart, TrendingUp, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
 export default function AdminPage() {
   const { profile, logout, loading: authLoading } = useAuth();
+  const db = useFirestore();
   const router = useRouter();
   const [transporters, setTransporters] = useState<any[]>([]);
   const [allTrips, setAllTrips] = useState<any[]>([]);
@@ -25,16 +28,29 @@ export default function AdminPage() {
   }, [profile, authLoading, router]);
 
   useEffect(() => {
-    if (profile?.role !== 'admin') return;
+    if (profile?.role !== 'admin' || !db) return;
 
     const transportersQuery = query(collection(db, "users"), where("role", "==", "transporter"));
     const unsubscribeTransporters = onSnapshot(transportersQuery, (snapshot) => {
       setTransporters(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, async (serverError) => {
+      const permissionError = new FirestorePermissionError({
+        path: 'users',
+        operation: 'list',
+      } satisfies SecurityRuleContext);
+      errorEmitter.emit('permission-error', permissionError);
     });
 
     const tripsQuery = query(collection(db, "trips"), orderBy("createdAt", "desc"));
     const unsubscribeTrips = onSnapshot(tripsQuery, (snapshot) => {
       setAllTrips(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setLoading(false);
+    }, async (serverError) => {
+      const permissionError = new FirestorePermissionError({
+        path: 'trips',
+        operation: 'list',
+      } satisfies SecurityRuleContext);
+      errorEmitter.emit('permission-error', permissionError);
       setLoading(false);
     });
 
@@ -42,7 +58,7 @@ export default function AdminPage() {
       unsubscribeTransporters();
       unsubscribeTrips();
     };
-  }, [profile]);
+  }, [profile, db]);
 
   if (authLoading || loading) return <div className="h-screen flex items-center justify-center bg-background"><Loader2 className="w-10 h-10 animate-spin text-primary" /></div>;
 

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -40,6 +39,8 @@ import {
   PieChart,
   Pie
 } from "recharts";
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
 export default function Dashboard() {
   const { profile, db } = useAuth();
@@ -91,11 +92,24 @@ export default function Dashboard() {
     const unsubscribeTrips = onSnapshot(tripsQuery, (snapshot) => {
       setTrips(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoading(false);
+    }, async (serverError) => {
+      const permissionError = new FirestorePermissionError({
+        path: 'trips',
+        operation: 'list',
+      } satisfies SecurityRuleContext);
+      errorEmitter.emit('permission-error', permissionError);
+      setLoading(false);
     });
 
     const partiesQuery = query(collection(db, "parties"), where("userId", "==", profile.uid));
     const unsubscribeParties = onSnapshot(partiesQuery, (snapshot) => {
       setParties(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, async (serverError) => {
+      const permissionError = new FirestorePermissionError({
+        path: 'parties',
+        operation: 'list',
+      } satisfies SecurityRuleContext);
+      errorEmitter.emit('permission-error', permissionError);
     });
 
     return () => {
@@ -228,6 +242,13 @@ export default function Dashboard() {
             partyMobile: selectedParty.mobile,
             updatedAt: serverTimestamp()
           });
+        }).catch(async (error) => {
+          const permissionError = new FirestorePermissionError({
+            path: tripRef.path,
+            operation: 'update',
+            requestResourceData: formData,
+          } satisfies SecurityRuleContext);
+          errorEmitter.emit('permission-error', permissionError);
         });
         toast({ title: "Trip Updated", description: "The trip details have been updated." });
       } else {
@@ -263,6 +284,13 @@ export default function Dashboard() {
           });
 
           transaction.update(counterRef, { lastLrNo: nextLrNo });
+        }).catch(async (error) => {
+          const permissionError = new FirestorePermissionError({
+            path: 'trips',
+            operation: 'create',
+            requestResourceData: formData,
+          } satisfies SecurityRuleContext);
+          errorEmitter.emit('permission-error', permissionError);
         });
         toast({ title: "Trip Created", description: "New trip record added successfully." });
       }
@@ -301,7 +329,14 @@ export default function Dashboard() {
 
   const handleDeleteTrip = async () => {
     if (!db || !tripToDelete) return;
-    deleteDoc(doc(db, "trips", tripToDelete.id));
+    deleteDoc(doc(db, "trips", tripToDelete.id))
+      .catch(async (error) => {
+        const permissionError = new FirestorePermissionError({
+          path: `trips/${tripToDelete.id}`,
+          operation: 'delete',
+        } satisfies SecurityRuleContext);
+        errorEmitter.emit('permission-error', permissionError);
+      });
     toast({ title: "Deleted", description: `Trip ${tripToDelete.lrNo} record deleted.` });
     setTripToDelete(null);
   };
@@ -343,7 +378,6 @@ export default function Dashboard() {
       trip.billNo?.toLowerCase().includes(queryStr)
     );
 
-    // Robust billed check handling older records
     const isBilled = trip.billed || trip.isBilled || false;
     const matchesStatus = filterStatus === "all" 
       ? true 
