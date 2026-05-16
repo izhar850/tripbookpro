@@ -1,0 +1,62 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper: Check if the user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper: Check if user is an admin
+    // Note: get() counts as a read operation.
+    function isAdmin() {
+      return isAuthenticated() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Helper: Check if document belongs to the authenticated user via a field
+    function isOwner(userIdField) {
+      return isAuthenticated() && 
+             (resource == null || resource.data[userIdField] == request.auth.uid) &&
+             (request.resource == null || request.resource.data[userIdField] == request.auth.uid);
+    }
+
+    // User Profiles
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow delete: if false;
+    }
+
+    // Parties (Clients)
+    match /parties/{partyId} {
+      allow read, write: if isAdmin() || isOwner('userId');
+    }
+
+    // Trips (Shipment Logs)
+    match /trips/{tripId} {
+      allow read, write: if isAdmin() || isOwner('userId');
+    }
+
+    // Invoices (Permanent Tax Records)
+    match /invoices/{invoiceId} {
+      allow read, create, update: if isAdmin() || isOwner('userId');
+      allow delete: if false;
+    }
+
+    // Sequential Counters (LR and Bill Tracking)
+    match /counters/{userId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    match /billCounters/{userId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Default Deny for all unknown collections
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}
