@@ -94,7 +94,7 @@ export default function SignupPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSignup} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2 col-span-2">
+            <div className="space-y-2 md:col-span-2">
               <Label htmlFor="companyName">Company Name</Label>
               <Input
                 id="companyName"
@@ -128,7 +128,7 @@ export default function SignupPage() {
                 className="bg-secondary/50"
               />
             </div>
-            <div className="space-y-2 col-span-2">
+            <div className="space-y-2 md:col-span-2">
               <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
@@ -142,7 +142,7 @@ export default function SignupPage() {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-primary h-11 font-bold shadow-indigo-500/20 shadow-lg col-span-2"
+              className="w-full bg-gradient-primary h-11 font-bold shadow-indigo-500/20 shadow-lg md:col-span-2"
             >
               {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : "Complete Registration"}
             </Button>
