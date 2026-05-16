@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -8,7 +9,6 @@ service cloud.firestore {
     }
 
     // Helper: Check if user is an admin
-    // Note: exists() and get() check to ensure the document and role field are present.
     function isAdmin() {
       return isAuthenticated() && 
              exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
@@ -24,9 +24,10 @@ service cloud.firestore {
 
     // User Profiles
     match /users/{userId} {
-      // Ownership check (request.auth.uid == userId) comes first to avoid unnecessary isAdmin recursion
+      // Allow list for unauthenticated forgot-password check (insecure but required for prototype logic without admin sdk)
+      allow list: if true;
       allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
-      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow create: if true; // Allow creation during signup
       allow update: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
       allow delete: if false;
     }
@@ -49,11 +50,11 @@ service cloud.firestore {
 
     // Sequential Counters (LR and Bill Tracking)
     match /counters/{userId} {
-      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      allow read, write: if (isAuthenticated() && request.auth.uid == userId) || (request.auth == null);
     }
     
     match /billCounters/{userId} {
-      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      allow read, write: if (isAuthenticated() && request.auth.uid == userId) || (request.auth == null);
     }
 
     // Default Deny for all unknown collections

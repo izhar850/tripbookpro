@@ -8,9 +8,11 @@ import { doc, getDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Printer, ArrowLeft, Loader2 } from "lucide-react";
 
-// Helper for number to words (Indian System)
+/**
+ * Converts a numeric amount into words (Indian System)
+ */
 function numberToWords(num: number): string {
-  if (num === 0) return 'Zero';
+  if (isNaN(num) || num === null || num === 0) return 'Zero';
   
   const single = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
   const double = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
@@ -27,7 +29,7 @@ function numberToWords(num: number): string {
   function handleLarge(n: number): string {
     let res = '';
     if (n >= 10000000) {
-      res += handleLarge(Math.floor(n / 10000000)) + ' Crore ';
+      res += convert(Math.floor(n / 10000000)) + ' Crore ';
       n %= 10000000;
     }
     if (n >= 100000) {
@@ -85,7 +87,6 @@ function InvoiceContent() {
   return (
     <div className="min-h-screen bg-slate-900 p-4 md:p-8 font-body">
       <div ref={invoiceRef} className="max-w-5xl mx-auto !bg-white !text-black border-2 border-black p-8 shadow-2xl printable-area">
-        {/* Force colors for print generation */}
         <style dangerouslySetInnerHTML={{ __html: `
           @media print {
             .printable-area { background-color: white !important; color: black !important; }

@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
@@ -74,8 +74,22 @@ export default function LoginPage() {
     try {
       const normalizedEmail = resetEmail.trim().toLowerCase();
       
-      // We removed the Firestore pre-check because it requires authentication which isn't available yet.
-      // Firebase sendPasswordResetEmail handles the request securely.
+      // Explicit check if user exists in the database
+      const usersRef = collection(db, "users");
+      const q = query(usersRef, where("email", "==", normalizedEmail));
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        toast({
+          title: "Reset Failed",
+          description: "No registered account found with this email address. Please check the email or sign up.",
+          variant: "destructive",
+        });
+        setResetLoading(false);
+        return;
+      }
+      
+      // User exists, send the reset link
       await sendPasswordResetEmail(auth, normalizedEmail);
       setIsResetOpen(false);
       setResetEmail("");
