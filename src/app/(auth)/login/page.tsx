@@ -1,10 +1,11 @@
+
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
-import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardContent, CardFooter } from "@/components/ui/card";
@@ -73,21 +74,8 @@ export default function LoginPage() {
     try {
       const normalizedEmail = resetEmail.trim().toLowerCase();
       
-      // Explicitly check if the user exists in Firestore first
-      const usersRef = collection(db, "users");
-      const q = query(usersRef, where("email", "==", normalizedEmail));
-      const querySnapshot = await getDocs(q);
-
-      if (querySnapshot.empty) {
-        toast({
-          title: "Reset Failed",
-          description: "No registered account found with this email address.",
-          variant: "destructive",
-        });
-        setResetLoading(false);
-        return;
-      }
-
+      // We removed the Firestore pre-check because it requires authentication which isn't available yet.
+      // Firebase sendPasswordResetEmail handles the request securely.
       await sendPasswordResetEmail(auth, normalizedEmail);
       setIsResetOpen(false);
       setResetEmail("");
@@ -99,7 +87,7 @@ export default function LoginPage() {
     } catch (error: any) {
       let message = "Could not send reset email. Please try again.";
       if (error.code === "auth/user-not-found") {
-        message = "No user found with this email address.";
+        message = "No registered account found with this email address.";
       } else if (error.code === "auth/invalid-email") {
         message = "Please enter a valid email address.";
       }
@@ -200,7 +188,7 @@ export default function LoginPage() {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-primary h-11 font-bold shadow-indigo-500/20 shadow-lg"
+              className="w-full bg-gradient-primary h-11 font-bold shadow-lg"
             >
               {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : "Sign In"}
             </Button>

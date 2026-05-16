@@ -96,6 +96,7 @@ function LRReceiptContent() {
             .printable-area * { color: black !important; border-color: black !important; }
             .printable-area .bg-gray-100 { background-color: #f3f4f6 !important; }
             .printable-area .bg-gray-50 { background-color: #f9fafb !important; }
+            .no-print { display: none !important; }
           }
           .printable-area { background-color: white !important; color: black !important; }
           .printable-area * { color: black !important; border-color: black !important; }

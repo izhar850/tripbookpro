@@ -92,6 +92,7 @@ function InvoiceContent() {
             .printable-area * { color: black !important; border-color: black !important; }
             .printable-area .bg-black { background-color: black !important; color: white !important; }
             .printable-area .bg-black * { color: white !important; }
+            .no-print { display: none !important; }
           }
           .printable-area { background-color: white !important; color: black !important; }
           .printable-area * { color: black !important; border-color: black !important; }
@@ -114,7 +115,7 @@ function InvoiceContent() {
            <div className="text-right flex flex-col justify-center">
               <h2 className="text-3xl font-bold border-b-2 border-black inline-block ml-auto mb-4">TAX INVOICE</h2>
               <p className="text-lg font-bold">Bill No: {billNo}</p>
-              <p className="text-md">Date: {invoice.createdAt?.seconds ? new Date(invoice.createdAt.seconds * 1000).toLocaleDateString() : invoice.date || 'N/A'}</p>
+              <p className="text-md">Date: {invoice.createdAt?.seconds ? new Date(invoice.createdAt.seconds * 1000).toLocaleDateString() : 'N/A'}</p>
            </div>
         </div>
 
