@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -6,6 +5,8 @@ import { useAuth as useFirebaseAuth, useFirestore, useUser } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { useRouter } from 'next/navigation';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
 export interface UserProfile {
   uid: string;
@@ -37,14 +38,25 @@ export function useAuth() {
 
     if (user && db) {
       const profileRef = doc(db, 'users', user.uid);
-      const unsubscribeProfile = onSnapshot(profileRef, (snapshot) => {
-        if (snapshot.exists()) {
-          setProfile({ ...snapshot.data(), uid: snapshot.id } as UserProfile);
-        } else {
-          setProfile(null);
+      const unsubscribeProfile = onSnapshot(
+        profileRef, 
+        (snapshot) => {
+          if (snapshot.exists()) {
+            setProfile({ ...snapshot.data(), uid: snapshot.id } as UserProfile);
+          } else {
+            setProfile(null);
+          }
+          setLoading(false);
+        },
+        async (serverError) => {
+          const permissionError = new FirestorePermissionError({
+            path: profileRef.path,
+            operation: 'get',
+          } satisfies SecurityRuleContext);
+          errorEmitter.emit('permission-error', permissionError);
+          setLoading(false);
         }
-        setLoading(false);
-      });
+      );
 
       return () => unsubscribeProfile();
     } else {

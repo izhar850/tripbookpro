@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -14,6 +13,8 @@ import { AlertCircle, CreditCard, Loader2, FileCheck, Users, ArrowRight, Receipt
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
 export default function BillingPage() {
   const { profile } = useAuth();
@@ -27,17 +28,25 @@ export default function BillingPage() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
 
-  // 1. Fetch all parties for this user
   useEffect(() => {
     if (!profile) return;
     const partiesQuery = query(collection(db, "parties"), where("userId", "==", profile.uid));
-    const unsubscribeParties = onSnapshot(partiesQuery, (snapshot) => {
-      setParties(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
+    const unsubscribeParties = onSnapshot(
+      partiesQuery, 
+      (snapshot) => {
+        setParties(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      },
+      async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+          path: 'parties',
+          operation: 'list',
+        } satisfies SecurityRuleContext);
+        errorEmitter.emit('permission-error', permissionError);
+      }
+    );
     return () => unsubscribeParties();
   }, [profile]);
 
-  // 2. Fetch ALL unbilled trips for this user (to derive which parties need billing)
   useEffect(() => {
     if (!profile) return;
     const unbilledQuery = query(
@@ -45,20 +54,29 @@ export default function BillingPage() {
       where("userId", "==", profile.uid), 
       where("billed", "==", false)
     );
-    const unsubscribe = onSnapshot(unbilledQuery, (snapshot) => {
-      setAllUnbilledTrips(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      setLoading(false);
-    });
+    const unsubscribe = onSnapshot(
+      unbilledQuery, 
+      (snapshot) => {
+        setAllUnbilledTrips(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        setLoading(false);
+      },
+      async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+          path: 'trips',
+          operation: 'list',
+        } satisfies SecurityRuleContext);
+        errorEmitter.emit('permission-error', permissionError);
+        setLoading(false);
+      }
+    );
     return () => unsubscribe();
   }, [profile]);
 
-  // Derived: Parties that actually have unbilled trips
   const partiesWithUnbilledTrips = useMemo(() => {
     const unbilledPartyIds = new Set(allUnbilledTrips.map(t => t.partyId));
     return parties.filter(p => unbilledPartyIds.has(p.id));
   }, [parties, allUnbilledTrips]);
 
-  // Derived: Specific unbilled trips for the selected party
   const currentTrips = useMemo(() => {
     return allUnbilledTrips.filter(t => t.partyId === selectedPartyId);
   }, [allUnbilledTrips, selectedPartyId]);
@@ -97,7 +115,7 @@ export default function BillingPage() {
         const invoiceRef = doc(collection(db, "invoices"));
         invoiceId = invoiceRef.id;
 
-        transaction.set(invoiceRef, {
+        const invoiceData = {
           userId: profile.uid,
           billNo,
           partyId: selectedPartyId,
@@ -119,7 +137,9 @@ export default function BillingPage() {
             ifscCode: profile.ifscCode
           },
           createdAt: serverTimestamp()
-        });
+        };
+
+        transaction.set(invoiceRef, invoiceData);
 
         selectedTripIds.forEach(id => {
           const tripRef = doc(db, "trips", id);
@@ -131,6 +151,13 @@ export default function BillingPage() {
         });
 
         transaction.update(counterRef, { lastBillNo: nextBillNo });
+      }).catch(async (error) => {
+        const permissionError = new FirestorePermissionError({
+          path: 'invoices',
+          operation: 'write',
+          requestResourceData: { partyId: selectedPartyId, tripCount: selectedTripIds.length },
+        } satisfies SecurityRuleContext);
+        errorEmitter.emit('permission-error', permissionError);
       });
 
       toast({ title: "Invoice Generated", description: `Bill No: ${billNo} is ready.` });

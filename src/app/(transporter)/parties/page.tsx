@@ -12,6 +12,8 @@ import { Plus, Edit, Trash2, Users, Search, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
 export default function PartiesPage() {
   const { profile } = useAuth();
@@ -31,10 +33,21 @@ export default function PartiesPage() {
   useEffect(() => {
     if (!profile) return;
     const q = query(collection(db, "parties"), where("userId", "==", profile.uid));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setParties(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      setLoading(false);
-    });
+    const unsubscribe = onSnapshot(
+      q, 
+      (snapshot) => {
+        setParties(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        setLoading(false);
+      },
+      async (serverError) => {
+        const permissionError = new FirestorePermissionError({
+          path: 'parties',
+          operation: 'list',
+        } satisfies SecurityRuleContext);
+        errorEmitter.emit('permission-error', permissionError);
+        setLoading(false);
+      }
+    );
     return () => unsubscribe();
   }, [profile]);
 
@@ -44,16 +57,33 @@ export default function PartiesPage() {
     
     try {
       if (editingParty) {
-        await updateDoc(doc(db, "parties", editingParty.id), {
+        const partyRef = doc(db, "parties", editingParty.id);
+        updateDoc(partyRef, {
           ...formData,
           updatedAt: serverTimestamp()
+        }).catch(async (error) => {
+          const permissionError = new FirestorePermissionError({
+            path: partyRef.path,
+            operation: 'update',
+            requestResourceData: formData,
+          } satisfies SecurityRuleContext);
+          errorEmitter.emit('permission-error', permissionError);
         });
         toast({ title: "Updated", description: "Party details updated." });
       } else {
-        await addDoc(collection(db, "parties"), {
+        const partiesCollection = collection(db, "parties");
+        const data = {
           ...formData,
           userId: profile.uid,
           createdAt: serverTimestamp()
+        };
+        addDoc(partiesCollection, data).catch(async (error) => {
+          const permissionError = new FirestorePermissionError({
+            path: 'parties',
+            operation: 'create',
+            requestResourceData: data,
+          } satisfies SecurityRuleContext);
+          errorEmitter.emit('permission-error', permissionError);
         });
         toast({ title: "Success", description: "New party added." });
       }
@@ -67,7 +97,14 @@ export default function PartiesPage() {
 
   const handleDelete = async (id: string) => {
     if (confirm("Delete this party?")) {
-      await deleteDoc(doc(db, "parties", id));
+      const partyRef = doc(db, "parties", id);
+      deleteDoc(partyRef).catch(async (error) => {
+        const permissionError = new FirestorePermissionError({
+          path: partyRef.path,
+          operation: 'delete',
+        } satisfies SecurityRuleContext);
+        errorEmitter.emit('permission-error', permissionError);
+      });
       toast({ title: "Deleted", description: "Party removed." });
     }
   };
