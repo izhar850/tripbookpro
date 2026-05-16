@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -9,7 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { AlertCircle, CreditCard, Loader2, FileCheck, Users, ArrowRight, ReceiptText } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AlertCircle, CreditCard, Loader2, FileCheck, Users, ArrowRight, ReceiptText, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -22,11 +24,13 @@ export default function BillingPage() {
   const router = useRouter();
   
   const [parties, setParties] = useState<any[]>([]);
-  const [allUnbilledTrips, setAllUnbilledTrips] = useState<any[]>([]);
+  const [trips, setTrips] = useState<any[]>([]);
   const [selectedPartyId, setSelectedPartyId] = useState("");
   const [selectedTripIds, setSelectedTripIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [viewStatus, setViewStatus] = useState<"unbilled" | "billed">("unbilled");
 
   useEffect(() => {
     if (!profile) return;
@@ -49,15 +53,17 @@ export default function BillingPage() {
 
   useEffect(() => {
     if (!profile) return;
-    const unbilledQuery = query(
+    setLoading(true);
+    const tripsQuery = query(
       collection(db, "trips"), 
       where("userId", "==", profile.uid), 
-      where("billed", "==", false)
+      where("billed", "==", viewStatus === "billed")
     );
+    
     const unsubscribe = onSnapshot(
-      unbilledQuery, 
+      tripsQuery, 
       (snapshot) => {
-        setAllUnbilledTrips(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        setTrips(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         setLoading(false);
       },
       async (serverError) => {
@@ -70,16 +76,17 @@ export default function BillingPage() {
       }
     );
     return () => unsubscribe();
-  }, [profile]);
+  }, [profile, viewStatus]);
 
-  const partiesWithUnbilledTrips = useMemo(() => {
-    const unbilledPartyIds = new Set(allUnbilledTrips.map(t => t.partyId));
-    return parties.filter(p => unbilledPartyIds.has(p.id));
-  }, [parties, allUnbilledTrips]);
+  const partiesWithTrips = useMemo(() => {
+    const partyIdsInTrips = new Set(trips.map(t => t.partyId));
+    return parties.filter(p => partyIdsInTrips.has(p.id));
+  }, [parties, trips]);
 
   const currentTrips = useMemo(() => {
-    return allUnbilledTrips.filter(t => t.partyId === selectedPartyId);
-  }, [allUnbilledTrips, selectedPartyId]);
+    if (!selectedPartyId) return trips;
+    return trips.filter(t => t.partyId === selectedPartyId);
+  }, [trips, selectedPartyId]);
 
   const toggleTripSelection = (id: string) => {
     setSelectedTripIds(prev => 
@@ -87,8 +94,77 @@ export default function BillingPage() {
     );
   };
 
-  const selectedTrips = currentTrips.filter(t => selectedTripIds.includes(t.id));
-  const invoiceTotal = selectedTrips.reduce((acc, t) => acc + (Number(t.totalAmount) || 0), 0);
+  const selectedTripsData = useMemo(() => {
+    return trips.filter(t => selectedTripIds.includes(t.id));
+  }, [trips, selectedTripIds]);
+
+  const invoiceTotal = selectedTripsData.reduce((acc, t) => acc + (Number(t.totalAmount) || 0), 0);
+
+  const handleExportCSV = () => {
+    if (selectedTripIds.length === 0) {
+      toast({
+        title: "No Selection",
+        description: "Please select at least one trip record to export.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setExporting(true);
+    try {
+      const headers = [
+        "Bill No", "LR No", "Date", "Party Name", "Vehicle No", 
+        "Source", "Destination", "Packages", "Weight", "Rate/Qtl", 
+        "Total Freight", "Advance", "Balance", "GST Pay By"
+      ];
+
+      const csvRows = selectedTripsData.map(t => [
+        t.billNo || "",
+        t.lrNo || "",
+        t.date || "",
+        t.partyName || "",
+        t.vehicleNo || "",
+        t.source || "",
+        t.destination || "",
+        t.packages || 0,
+        t.weight || 0,
+        t.rateQtl || 0,
+        t.totalFreight || 0,
+        t.advance || 0,
+        t.balance || 0,
+        t.gstPayBy || ""
+      ].map(val => {
+        if (typeof val === 'string') return `"${val.replace(/"/g, '""')}"`;
+        return val;
+      }).join(","));
+
+      const csvContent = [headers.join(","), ...csvRows].join("\n");
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const timestamp = new Date().toISOString().split('T')[0];
+      
+      link.setAttribute("href", url);
+      link.setAttribute("download", `TripBook_Billing_${timestamp}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast({
+        title: "Success",
+        description: "Billing data exported successfully."
+      });
+    } catch (error) {
+      toast({
+        title: "Export Failed",
+        description: "An unexpected error occurred during CSV generation.",
+        variant: "destructive"
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const handleGenerateInvoice = async () => {
     if (!profile || selectedTripIds.length === 0) return;
@@ -124,7 +200,7 @@ export default function BillingPage() {
           partyAddress: party.address || "",
           partyMobile: party.mobile || "",
           invoiceTotal,
-          trips: selectedTrips,
+          trips: selectedTripsData,
           transporterProfile: {
             companyName: profile.companyName,
             address: profile.address,
@@ -180,6 +256,17 @@ export default function BillingPage() {
           <h1 className="text-3xl font-headline font-bold">Billing Center</h1>
           <p className="text-muted-foreground">Manage pending shipments and tax invoice generation</p>
         </div>
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <Button 
+            variant="outline" 
+            onClick={handleExportCSV} 
+            disabled={selectedTripIds.length === 0 || exporting}
+            className="flex-1 md:flex-none h-11 border-border/50 font-bold"
+          >
+            {exporting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Download className="w-4 h-4 mr-2" />}
+            Export CSV
+          </Button>
+        </div>
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
@@ -187,27 +274,24 @@ export default function BillingPage() {
           <Card className="bg-card border-border/50">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
-                <Users className="w-5 h-5 text-primary" /> Select Party
+                <Users className="w-5 h-5 text-primary" /> Party Filter
               </CardTitle>
-              <CardDescription>Only parties with unbilled trips are listed below</CardDescription>
+              <CardDescription>Filter unbilled or billed trips by client</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <Select value={selectedPartyId} onValueChange={(val) => { setSelectedPartyId(val); setSelectedTripIds([]); }}>
                 <SelectTrigger className="h-12 bg-secondary/30">
-                  <SelectValue placeholder="Choose an unbilled party..." />
+                  <SelectValue placeholder="All Parties" />
                 </SelectTrigger>
                 <SelectContent>
-                  {partiesWithUnbilledTrips.length === 0 ? (
-                    <SelectItem value="none" disabled>No pending billing found</SelectItem>
-                  ) : (
-                    partiesWithUnbilledTrips.map(p => (
-                      <SelectItem key={p.id} value={p.id}>{p.partyName}</SelectItem>
-                    ))
-                  )}
+                   <SelectItem value="none">All Parties</SelectItem>
+                  {partiesWithTrips.map(p => (
+                    <SelectItem key={p.id} value={p.id}>{p.partyName}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
 
-              {selectedPartyId && (
+              {viewStatus === "unbilled" && selectedPartyId && selectedPartyId !== "none" && (
                 <div className="pt-6 mt-6 border-t border-border/50 space-y-4">
                   <div className="bg-primary/5 p-4 rounded-xl border border-primary/10">
                     <div className="flex justify-between text-xs mb-1">
@@ -233,7 +317,7 @@ export default function BillingPage() {
             </CardContent>
           </Card>
 
-          {partiesWithUnbilledTrips.length > 0 && !selectedPartyId && (
+          {viewStatus === "unbilled" && partiesWithTrips.length > 0 && !selectedPartyId && (
             <div className="bg-blue-500/5 border border-blue-500/20 p-6 rounded-2xl flex items-start gap-4 animate-in fade-in slide-in-from-left-4">
               <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
                 <ReceiptText className="w-5 h-5 text-blue-500" />
@@ -241,32 +325,33 @@ export default function BillingPage() {
               <div className="space-y-1">
                 <h4 className="font-bold text-blue-500">Pending Actions</h4>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  You have <b>{partiesWithUnbilledTrips.length}</b> client(s) waiting for invoices. Select one from the list to process their shipments.
+                  You have shipments waiting for invoices. Select a party from the list to process their shipments into a bill.
                 </p>
               </div>
             </div>
           )}
         </div>
 
-        <div className="md:col-span-2">
+        <div className="md:col-span-2 space-y-4">
+          <Tabs value={viewStatus} onValueChange={(v: any) => { setViewStatus(v); setSelectedTripIds([]); }} className="w-full">
+            <TabsList className="bg-secondary/50 w-full sm:w-auto">
+              <TabsTrigger value="unbilled" className="flex-1 sm:flex-none">Pending Billing</TabsTrigger>
+              <TabsTrigger value="billed" className="flex-1 sm:flex-none">Processed History</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
           <Card className="bg-card border-border/50 min-h-[400px]">
             <CardHeader className="border-b border-border/50 pb-4">
-              <CardTitle className="text-lg">Unbilled Shipments</CardTitle>
+              <CardTitle className="text-lg">
+                {viewStatus === "unbilled" ? "Unbilled Shipments" : "Billing History"}
+              </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              {!selectedPartyId ? (
-                <div className="h-96 flex flex-col items-center justify-center text-muted-foreground">
-                  <div className="w-16 h-16 bg-secondary/50 rounded-full flex items-center justify-center mb-6">
-                    <ArrowRight className="w-8 h-8 opacity-20" />
-                  </div>
-                  <p className="font-bold text-lg">Select a party to view their unbilled cargo</p>
-                  <p className="text-xs opacity-60">Trips marked as 'Unbilled' in the registry will appear here.</p>
-                </div>
-              ) : currentTrips.length === 0 ? (
+              {currentTrips.length === 0 ? (
                 <div className="h-96 flex flex-col items-center justify-center text-muted-foreground p-8 text-center">
                   <AlertCircle className="w-16 h-16 mb-4 opacity-20 text-orange-500" />
-                  <p className="font-bold text-lg">No unbilled trips for this party.</p>
-                  <p className="text-sm max-w-xs mx-auto">Either all trips have been billed or no trips are logged for this client yet.</p>
+                  <p className="font-bold text-lg">No records found.</p>
+                  <p className="text-sm max-w-xs mx-auto">There are no trips matching your criteria in this section.</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -274,9 +359,9 @@ export default function BillingPage() {
                     <TableHeader className="bg-secondary/30">
                       <TableRow>
                         <TableHead className="w-[60px]"></TableHead>
+                        {viewStatus === "billed" && <TableHead className="font-bold">Bill No</TableHead>}
                         <TableHead className="font-bold">LR No</TableHead>
-                        <TableHead className="font-bold">Date</TableHead>
-                        <TableHead className="font-bold">Vehicle</TableHead>
+                        <TableHead className="font-bold">Party</TableHead>
                         <TableHead className="font-bold">Route</TableHead>
                         <TableHead className="font-bold text-right">Amount</TableHead>
                       </TableRow>
@@ -291,9 +376,9 @@ export default function BillingPage() {
                               className="w-5 h-5"
                             />
                           </TableCell>
+                          {viewStatus === "billed" && <TableCell className="font-mono text-xs">{trip.billNo}</TableCell>}
                           <TableCell className="font-bold text-primary">{trip.lrNo}</TableCell>
-                          <TableCell className="text-sm">{trip.date}</TableCell>
-                          <TableCell className="text-xs font-mono">{trip.vehicleNo}</TableCell>
+                          <TableCell className="text-sm truncate max-w-[120px]">{trip.partyName}</TableCell>
                           <TableCell className="text-xs">{trip.source} → {trip.destination}</TableCell>
                           <TableCell className="text-right font-bold text-foreground">₹{trip.totalAmount.toLocaleString()}</TableCell>
                         </TableRow>
