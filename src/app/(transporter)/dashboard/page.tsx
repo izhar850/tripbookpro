@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
-import { Plus, Edit, Trash2, FileText, Loader2, Sparkles, Search, TrendingUp, Users as UsersIcon, Wallet, ArrowUpRight, Truck, Receipt } from "lucide-react";
+import { Plus, Edit, Trash2, FileText, Loader2, Search, TrendingUp, Users as UsersIcon, Wallet, ArrowUpRight, Truck, Receipt } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
-import { getTransporterTripAISuggestions } from "@/ai/flows/transporter-trip-ai-suggestions";
+
 import { cn } from "@/lib/utils";
 import { 
   BarChart, 
@@ -52,7 +52,7 @@ export default function Dashboard() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [editingTrip, setEditingTrip] = useState<any>(null);
   const [tripToDelete, setTripToDelete] = useState<any>(null);
-  const [isAiLoading, setIsAiLoading] = useState(false);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
 
@@ -165,42 +165,7 @@ export default function Dashboard() {
     return { totalFreight, totalAmount, balance };
   }, [formData.weight, formData.rateQtl, formData.unloadingCharges, formData.advance]);
 
-  const handleAiSuggestion = async () => {
-    if (!formData.source || !formData.destination || !formData.goodsDescription || !formData.weight || !formData.vehicleType) {
-      toast({
-        title: "Missing Info",
-        description: "Please fill source, destination, goods, weight, and vehicle type for AI suggestions.",
-        variant: "destructive"
-      });
-      return;
-    }
 
-    setIsAiLoading(true);
-    try {
-      const suggestion = await getTransporterTripAISuggestions({
-        source: formData.source,
-        destination: formData.destination,
-        goodsDescription: formData.goodsDescription,
-        weight: Number(formData.weight),
-        vehicleType: formData.vehicleType
-      });
-
-      setFormData(prev => ({
-        ...prev,
-        rateQtl: suggestion.suggestedRateQtl.toString(),
-        notes: suggestion.logisticalNotes
-      }));
-
-      toast({
-        title: "AI Suggestion Applied",
-        description: `Suggested rate: ₹${suggestion.suggestedRateQtl} per quintal.`
-      });
-    } catch (error) {
-      toast({ title: "AI Error", description: "Failed to get AI suggestions.", variant: "destructive" });
-    } finally {
-      setIsAiLoading(false);
-    }
-  };
 
   const handleSaveTrip = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -485,16 +450,7 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <Button 
-                type="button" 
-                variant="outline" 
-                className="w-full border-primary/50 text-primary font-bold h-11"
-                onClick={handleAiSuggestion}
-                disabled={isAiLoading}
-              >
-                {isAiLoading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Sparkles className="w-5 h-5 mr-2" />}
-                AI Pricing Suggestion
-              </Button>
+
 
               <div className="grid grid-cols-2 gap-4 p-4 bg-secondary/30 rounded-xl">
                 <div className="space-y-2">

@@ -61,6 +61,7 @@ export default function LoginPage() {
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     if (!resetEmail) {
       toast({
         title: "Error",
