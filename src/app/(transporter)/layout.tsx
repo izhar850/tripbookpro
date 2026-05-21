@@ -18,7 +18,7 @@ import {
   useSidebar
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Loader2, LayoutDashboard, Users, CreditCard, User, LogOut, Truck, Menu } from "lucide-react";
+import { Loader2, LayoutDashboard, Users, CreditCard, User, LogOut, Truck, Menu, Star } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -53,6 +53,7 @@ function NavMenu() {
     // Driver module is hidden from the active workflow; legacy driver data/code remains untouched.
     { name: "Parties", href: "/parties", icon: Users },
     { name: "Billing", href: "/billing", icon: CreditCard },
+    { name: "Subscription", href: "/subscription", icon: Star },
     { name: "Profile", href: "/profile", icon: User },
   ];
 

@@ -25,6 +25,7 @@ import {
   type SortConfig,
 } from "@/lib/transport-utils";
 import { subscribeToOwnedCollection } from "@/lib/firestore-query-utils";
+import { getSubscriptionBlockMessage, isSubscriptionActive } from "@/lib/account-utils";
 
 type BillingSortKey = "date" | "billNo" | "lrNo" | "partyName" | "vehicleNo" | "status" | "totalAmount";
 
@@ -42,6 +43,18 @@ export default function BillingPage() {
   const [exporting, setExporting] = useState(false);
   const [viewStatus, setViewStatus] = useState<"unbilled" | "billed">("unbilled");
   const [billingSort, setBillingSort] = useState<SortConfig<BillingSortKey>>({ key: "date", direction: "desc" });
+  const subscriptionActive = isSubscriptionActive(profile);
+  const subscriptionBlockMessage = getSubscriptionBlockMessage(profile);
+
+  const guardSubscriptionAction = () => {
+    if (subscriptionActive) return false;
+    toast({
+      title: "Subscription Required",
+      description: subscriptionBlockMessage || "Subscription expired. Please renew to continue.",
+      variant: "destructive",
+    });
+    return true;
+  };
 
   useEffect(() => {
     if (!profile) return;
@@ -198,6 +211,7 @@ export default function BillingPage() {
 
   const handleGenerateInvoice = async () => {
     if (!profile || selectedTripIds.length === 0) return;
+    if (guardSubscriptionAction()) return;
     setGenerating(true);
 
     const party = parties.find(p => p.id === selectedPartyId);
@@ -344,8 +358,8 @@ export default function BillingPage() {
                   
                   <Button 
                     onClick={handleGenerateInvoice}
-                    disabled={selectedTripIds.length === 0 || generating}
-                    title="Generate Tax Invoice"
+                    disabled={selectedTripIds.length === 0 || generating || !subscriptionActive}
+                    title={!subscriptionActive ? "Subscription expired. Please renew to continue." : "Generate Tax Invoice"}
                     className="w-full bg-gradient-primary h-12 shadow-indigo-500/20 shadow-lg font-bold text-lg"
                   >
                     {generating ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <FileCheck className="w-5 h-5 mr-2" />}

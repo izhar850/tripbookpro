@@ -273,9 +273,17 @@ export default function Dashboard() {
   const subscriptionBlockMessage = getSubscriptionBlockMessage(profile);
   const subscriptionStatusStyles: Record<string, string> = {
     active: "bg-green-500/10 text-green-500 border-green-500/20",
+    expiring_soon: "bg-orange-500/10 text-orange-500 border-orange-500/20",
     expired: "bg-destructive/10 text-destructive border-destructive/20",
     pending: "bg-orange-500/10 text-orange-500 border-orange-500/20",
     suspended: "bg-destructive/10 text-destructive border-destructive/20",
+  };
+  const subscriptionStatusLabels: Record<string, string> = {
+    active: "Active",
+    expiring_soon: "Expiring Soon",
+    expired: "Expired",
+    pending: "Pending",
+    suspended: "Suspended",
   };
 
   const showRenewalMessage = () => {
@@ -1104,57 +1112,58 @@ export default function Dashboard() {
         </Sheet>
       </div>
 
-      {subscriptionStatus === "expired" && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm font-bold text-destructive flex items-start gap-3">
-          <ShieldAlert className="w-5 h-5 mt-0.5 shrink-0" />
-          <span>Subscription expired. Please contact admin to renew.</span>
-        </div>
-      )}
-
-      {subscriptionStatus === "active" && daysRemaining !== null && daysRemaining <= 7 && (
-        <div className="rounded-lg border border-orange-500/30 bg-orange-500/10 p-4 text-sm font-bold text-orange-500 flex items-start gap-3">
-          <CalendarDays className="w-5 h-5 mt-0.5 shrink-0" />
-          <span>Your subscription expires in {daysRemaining} days.</span>
-        </div>
-      )}
-
-      <Card className="bg-card border-border/50">
-        <CardHeader className="pb-3">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <CardTitle className="text-lg">Subscription</CardTitle>
-              <CardDescription>Manual subscription managed by TripBook admin</CardDescription>
+      <Card
+        className={cn(
+          "bg-card border-border/50",
+          subscriptionStatus === "expired" && "border-destructive/30 bg-destructive/10",
+          subscriptionStatus === "expiring_soon" && "border-orange-500/30 bg-orange-500/10"
+        )}
+      >
+        <CardContent className="p-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-start gap-3">
+            <div
+              className={cn(
+                "mt-0.5 h-10 w-10 rounded-lg flex items-center justify-center",
+                subscriptionStatus === "expired" ? "bg-destructive/15 text-destructive" : "bg-primary/10 text-primary",
+                subscriptionStatus === "expiring_soon" && "bg-orange-500/15 text-orange-500"
+              )}
+            >
+              {subscriptionStatus === "expired" ? (
+                <ShieldAlert className="h-5 w-5" />
+              ) : (
+                <CalendarDays className="h-5 w-5" />
+              )}
             </div>
-            <Badge variant="outline" className={cn("w-fit capitalize", subscriptionStatusStyles[subscriptionStatus])}>
-              {subscriptionStatus}
-            </Badge>
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="font-headline text-lg font-bold">
+                  {subscriptionStatus === "expired"
+                    ? "Subscription Expired"
+                    : subscriptionStatus === "expiring_soon"
+                      ? `Your subscription expires in ${daysRemaining ?? 0} days.`
+                      : `${currentPlanName} Active`}
+                </h2>
+                <Badge variant="outline" className={cn("w-fit", subscriptionStatusStyles[subscriptionStatus])}>
+                  {subscriptionStatusLabels[subscriptionStatus] || subscriptionStatus}
+                </Badge>
+              </div>
+              {subscriptionStatus === "expired" ? (
+                <p className="text-sm font-medium text-destructive">Read-only mode enabled.</p>
+              ) : subscriptionStatus === "expiring_soon" ? (
+                <p className="text-sm font-medium text-orange-500">Please renew to avoid service interruption.</p>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Valid Till: {formatDateInputValue(profile?.planExpiryDate) || "Not set"}
+                  {daysRemaining !== null ? ` | ${daysRemaining} Days Remaining` : ""}
+                </p>
+              )}
+            </div>
           </div>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-4">
-          <div>
-            <p className="text-xs uppercase tracking-widest text-muted-foreground font-bold">Current Plan</p>
-            <p className="text-xl font-headline font-bold">{currentPlanName}</p>
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-widest text-muted-foreground font-bold">Status</p>
-            <p className="text-xl font-headline font-bold capitalize">{subscriptionStatus}</p>
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-widest text-muted-foreground font-bold">Valid Till</p>
-            <p className="text-xl font-headline font-bold">{formatDateInputValue(profile?.planExpiryDate) || "Not set"}</p>
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-widest text-muted-foreground font-bold">Days Remaining</p>
-            <p className="text-xl font-headline font-bold">{daysRemaining ?? "N/A"}</p>
-          </div>
-          <div className="md:col-span-4 flex flex-col sm:flex-row gap-3">
-            <Button type="button" variant="outline" onClick={() => setIsPlansOpen(true)} className="font-bold">
-              View Plans
+          <Link href="/subscription">
+            <Button type="button" variant={subscriptionStatus === "active" ? "outline" : "default"} className="w-full md:w-auto font-bold">
+              View Subscription
             </Button>
-            <Button type="button" onClick={showRenewalMessage} className="bg-gradient-primary font-bold">
-              Contact Admin / Request Renewal
-            </Button>
-          </div>
+          </Link>
         </CardContent>
       </Card>
 

@@ -14,7 +14,7 @@ import { numberToWords } from "@/lib/format-utils";
 import { normalizeMultiline, normalizeText, normalizeVehicleNo } from "@/lib/transport-utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
-import { getDateFromFirestoreValue } from "@/lib/account-utils";
+import { getDateFromFirestoreValue, getSubscriptionBlockMessage, isSubscriptionActive } from "@/lib/account-utils";
 
 type EditableInvoiceTrip = {
   date: string;
@@ -89,6 +89,8 @@ function InvoiceContent() {
   const invoiceRef = useRef<HTMLDivElement>(null);
   const { profile: authProfile } = useAuth();
   const { toast } = useToast();
+  const subscriptionActive = isSubscriptionActive(authProfile);
+  const subscriptionBlockMessage = getSubscriptionBlockMessage(authProfile) || "Subscription expired. Please renew to continue.";
   
   const [invoice, setInvoice] = useState<any>(null);
   const [editData, setEditData] = useState<EditableInvoice | null>(null);
@@ -161,6 +163,14 @@ function InvoiceContent() {
 
   const handleSaveInvoice = async () => {
     if (!invoiceId || !editData) return;
+    if (!subscriptionActive) {
+      toast({
+        title: "Subscription Required",
+        description: subscriptionBlockMessage,
+        variant: "destructive",
+      });
+      return;
+    }
 
     setSaving(true);
     try {
@@ -251,7 +261,7 @@ function InvoiceContent() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h3 className="font-bold">LR Rows</h3>
-              <Button type="button" size="sm" variant="outline" onClick={handleAddTripRow}>
+              <Button type="button" size="sm" variant="outline" onClick={handleAddTripRow} disabled={!subscriptionActive} title={!subscriptionActive ? subscriptionBlockMessage : "Add Row"}>
                 <Plus className="w-4 h-4 mr-2" /> Add Row
               </Button>
             </div>
@@ -268,7 +278,7 @@ function InvoiceContent() {
                   <Input type="number" step="0.01" placeholder="Freight" value={trip.totalFreight} onChange={(event) => updateTripField(index, "totalFreight", event.target.value)} />
                   <Input type="number" step="0.01" placeholder="Unloading" value={trip.unloadingCharges} onChange={(event) => updateTripField(index, "unloadingCharges", event.target.value)} />
                   <Input type="number" step="0.01" placeholder="Amount" value={trip.totalAmount} onChange={(event) => updateTripField(index, "totalAmount", event.target.value)} />
-                  <Button type="button" variant="ghost" className="text-destructive" onClick={() => handleRemoveTripRow(index)}>
+                  <Button type="button" variant="ghost" className="text-destructive" onClick={() => handleRemoveTripRow(index)} disabled={!subscriptionActive} title={!subscriptionActive ? subscriptionBlockMessage : "Remove"}>
                     <Trash2 className="w-4 h-4 mr-2" /> Remove
                   </Button>
                 </div>
@@ -285,7 +295,7 @@ function InvoiceContent() {
             <Button type="button" variant="outline" onClick={handleCancelEdit}>
               <X className="w-4 h-4 mr-2" /> Cancel
             </Button>
-            <Button type="button" onClick={handleSaveInvoice} disabled={saving} className="bg-gradient-primary font-bold">
+            <Button type="button" onClick={handleSaveInvoice} disabled={saving || !subscriptionActive} title={!subscriptionActive ? subscriptionBlockMessage : "Save Bill"} className="bg-gradient-primary font-bold">
               {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
               Save Bill
             </Button>
@@ -412,7 +422,7 @@ function InvoiceContent() {
          <Button variant="outline" onClick={() => router.back()} className="bg-white border-black text-black hover:bg-gray-100 font-bold h-12 shadow-xl">
             <ArrowLeft className="w-5 h-5 mr-2" /> Back
          </Button>
-         <Button onClick={() => setIsEditing(true)} className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold h-12 shadow-xl">
+         <Button onClick={() => setIsEditing(true)} disabled={!subscriptionActive} title={!subscriptionActive ? subscriptionBlockMessage : "Edit Bill"} className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold h-12 shadow-xl">
             <Edit className="w-5 h-5 mr-2" /> Edit Bill
          </Button>
          <Button onClick={() => window.print()} disabled={isEditing} className="bg-black text-white hover:bg-gray-800 font-bold h-12 shadow-xl">

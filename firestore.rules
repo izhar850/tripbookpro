@@ -79,17 +79,15 @@ service cloud.firestore {
     match /trips/{tripId} {
       allow read: if isSuperAdmin() || (hasUserProfile() && ownsCompany(resource.data));
       allow create: if isSuperAdmin() || (isActiveTransporter() && ownsCompany(request.resource.data));
-      allow update: if isSuperAdmin() ||
-                    (isActiveTransporter() && ownsCompany(resource.data)) ||
-                    (hasUserProfile() && ownsCompany(resource.data) && isBillingMarkUpdate());
+      allow update: if isSuperAdmin() || (isActiveTransporter() && ownsCompany(resource.data));
       allow delete: if isSuperAdmin() || (isActiveTransporter() && ownsCompany(resource.data));
     }
 
     // Invoices (Permanent Tax Records)
     match /invoices/{invoiceId} {
       allow read: if isSuperAdmin() || (hasUserProfile() && ownsCompany(resource.data));
-      allow create: if isSuperAdmin() || (hasUserProfile() && ownsCompany(request.resource.data));
-      allow update: if isSuperAdmin() || (hasUserProfile() && ownsCompany(resource.data));
+      allow create: if isSuperAdmin() || (isActiveTransporter() && ownsCompany(request.resource.data));
+      allow update: if isSuperAdmin() || (isActiveTransporter() && ownsCompany(resource.data));
       allow delete: if false;
     }
 
@@ -103,7 +101,7 @@ service cloud.firestore {
     
     match /billCounters/{userId} {
       allow read, write: if isSuperAdmin() || (
-        hasUserProfile() &&
+        isActiveTransporter() &&
         (request.auth.uid == userId || (hasUserProfile() && currentUser().companyId == userId))
       );
     }
@@ -117,7 +115,8 @@ service cloud.firestore {
 
     // Drivers
     match /drivers/{driverId} {
-      allow read, update, delete: if isSuperAdmin() || (hasUserProfile() && ownsCompany(resource.data));
+      allow read: if isSuperAdmin() || (hasUserProfile() && ownsCompany(resource.data));
+      allow update, delete: if isSuperAdmin() || (isActiveTransporter() && ownsCompany(resource.data));
       allow create: if isSuperAdmin() || (isActiveTransporter() && ownsCompany(request.resource.data));
     }
 

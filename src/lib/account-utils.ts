@@ -36,12 +36,14 @@ export const PLAN_DEFINITIONS: Record<TransporterPlan, {
     price: 1299,
     durationDays: 90,
     badge: "Recommended",
+    discountMessage: "Save \u20b9198",
   },
   six_months: {
     name: "6 Months Plan",
     price: 2399,
     durationDays: 180,
     badge: "Best Value",
+    discountMessage: "Save \u20b9595",
   },
   yearly: {
     name: "1 Year Plan",
@@ -54,13 +56,11 @@ export const PLAN_DEFINITIONS: Record<TransporterPlan, {
 
 export const SUBSCRIPTION_FEATURES = [
   "Trip Management",
-  "Party Management",
+  "LR Receipt",
+  "Billing Invoice",
   "Vehicle Management",
-  "LR Receipt Printing",
-  "Billing Invoice Generation",
-  "Payment Tracking",
   "Expense Tracking",
-  "POD/File Upload",
+  "POD Upload",
   "Reports",
   "Cloud Backup",
 ];
@@ -134,6 +134,8 @@ export function getSubscriptionStatus(profile: any) {
   if (accountStatus === "pending") return "pending";
   if (accountStatus === "suspended") return "suspended";
   if (isPlanExpired(profile)) return "expired";
+  const daysRemaining = getDaysRemaining(profile);
+  if (daysRemaining !== null && daysRemaining < 7) return "expiring_soon";
   return "active";
 }
 
