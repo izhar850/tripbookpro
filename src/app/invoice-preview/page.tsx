@@ -19,6 +19,7 @@ import { getDateFromFirestoreValue, getSubscriptionBlockMessage, isSubscriptionA
 type EditableInvoiceTrip = {
   date: string;
   lrNo: string;
+  packages: string;
   vehicleNo: string;
   source: string;
   destination: string;
@@ -43,6 +44,7 @@ type EditableInvoice = {
 const emptyInvoiceTrip = (): EditableInvoiceTrip => ({
   date: "",
   lrNo: "",
+  packages: "",
   vehicleNo: "",
   source: "",
   destination: "",
@@ -58,6 +60,25 @@ function formatInvoiceDate(invoice: any) {
   return date ? date.toLocaleDateString() : "N/A";
 }
 
+function displayInvoiceValue(value: unknown) {
+  const text = String(value ?? "").trim();
+  return text === "0" ? "" : text;
+}
+
+function displayInvoiceMoney(value: unknown) {
+  const text = String(value ?? "").trim();
+  const amount = Number(value || 0);
+  if (!text || amount === 0) return "";
+  return `Rs. ${amount.toFixed(2)}`;
+}
+
+function displayRoute(source: unknown, destination: unknown) {
+  const from = displayInvoiceValue(source);
+  const to = displayInvoiceValue(destination);
+  if (!from && !to) return "";
+  return `${from}-${to}`;
+}
+
 function getEditableInvoice(invoice: any): EditableInvoice {
   return {
     billNo: normalizeText(invoice?.billNo),
@@ -70,6 +91,7 @@ function getEditableInvoice(invoice: any): EditableInvoice {
     trips: (invoice?.trips || []).map((trip: any) => ({
       date: normalizeText(trip.date),
       lrNo: normalizeText(trip.lrNo),
+      packages: String(trip.packages ?? ""),
       vehicleNo: normalizeVehicleNo(trip.vehicleNo),
       source: normalizeText(trip.source),
       destination: normalizeText(trip.destination),
@@ -125,8 +147,16 @@ function InvoiceContent() {
   if (!invoice) return <div className="p-8 text-center text-foreground">Invoice data not found. <Button variant="link" onClick={() => router.back()}>Go Back</Button></div>;
 
   const { transporterProfile, trips, billNo, partyName, partyAddress, partyGst, partyMobile, invoiceTotal } = invoice;
-  const printableTotal = Number(invoiceTotal || trips.reduce((sum: number, trip: any) => sum + Number(trip.totalAmount || 0), 0));
-  const editedInvoiceTotal = editData?.trips.reduce((sum, trip) => sum + Number(trip.totalAmount || 0), 0) || 0;
+  const getTripFinalAmount = (trip: any) => Number(trip.totalFreight || 0) + Number(trip.unloadingCharges || 0);
+  const firstTrip = trips?.[0] || {};
+  const billToName = partyName || firstTrip.consigneeName || firstTrip.partyName || "";
+  const billToAddress = partyAddress || firstTrip.consigneeAddress || firstTrip.partyAddress || "";
+  const billToGst = partyGst || firstTrip.consigneeGst || firstTrip.partyGst || "";
+  const billToMobile = partyMobile || firstTrip.consigneeMobile || firstTrip.partyMobile || "";
+  const printableTotal = trips.length > 0
+    ? trips.reduce((sum: number, trip: any) => sum + getTripFinalAmount(trip), 0)
+    : Number(invoiceTotal || 0);
+  const editedInvoiceTotal = editData?.trips.reduce((sum, trip) => sum + Number(trip.totalFreight || 0) + Number(trip.unloadingCharges || 0), 0) || 0;
 
   const updateEditField = (field: keyof EditableInvoice, value: string) => {
     if (!editData) return;
@@ -178,6 +208,7 @@ function InvoiceContent() {
         ...trip,
         date: normalizeText(trip.date),
         lrNo: normalizeText(trip.lrNo),
+        packages: Number(trip.packages) || 0,
         vehicleNo: normalizeVehicleNo(trip.vehicleNo),
         source: normalizeText(trip.source),
         destination: normalizeText(trip.destination),
@@ -185,7 +216,7 @@ function InvoiceContent() {
         rateQtl: Number(trip.rateQtl) || 0,
         totalFreight: Number(trip.totalFreight) || 0,
         unloadingCharges: Number(trip.unloadingCharges) || 0,
-        totalAmount: Number(trip.totalAmount) || 0,
+        totalAmount: (Number(trip.totalFreight) || 0) + (Number(trip.unloadingCharges) || 0),
       }));
       const updatedInvoiceTotal = cleanedTrips.reduce((sum, trip) => sum + Number(trip.totalAmount || 0), 0);
       const updatePayload = {
@@ -270,6 +301,7 @@ function InvoiceContent() {
                 <div key={index} className="grid grid-cols-2 md:grid-cols-6 gap-3 rounded-lg border border-border/50 bg-secondary/20 p-3">
                   <Input type="date" value={trip.date} onChange={(event) => updateTripField(index, "date", event.target.value)} />
                   <Input placeholder="LR No" value={trip.lrNo} onChange={(event) => updateTripField(index, "lrNo", event.target.value)} />
+                  <Input type="number" placeholder="Packages" value={trip.packages} onChange={(event) => updateTripField(index, "packages", event.target.value)} />
                   <Input placeholder="Vehicle" value={trip.vehicleNo} onChange={(event) => updateTripField(index, "vehicleNo", event.target.value)} />
                   <Input placeholder="Source" value={trip.source} onChange={(event) => updateTripField(index, "source", event.target.value)} />
                   <Input placeholder="Destination" value={trip.destination} onChange={(event) => updateTripField(index, "destination", event.target.value)} />
@@ -306,12 +338,15 @@ function InvoiceContent() {
       <div ref={invoiceRef} className="max-w-5xl mx-auto !bg-white !text-black border-2 border-black p-8 shadow-2xl printable-area">
         <style dangerouslySetInnerHTML={{ __html: `
           @media print {
+            @page { size: A4; margin: 10mm; }
+            html, body { background: white !important; }
             .printable-area { background-color: white !important; color: black !important; }
             .printable-area * { color: black !important; border-color: black !important; }
             .printable-area .bg-black { background-color: black !important; color: white !important; }
             .printable-area .bg-black * { color: white !important; }
             .no-print { display: none !important; }
           }
+          .printable-area, .printable-area * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
           .printable-area { background-color: white !important; color: black !important; }
           .printable-area * { color: black !important; border-color: black !important; }
           .printable-area .bg-black { background-color: black !important; color: white !important; }
@@ -342,12 +377,12 @@ function InvoiceContent() {
            <h3 className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-widest">Billing To:</h3>
            <div className="grid grid-cols-2">
               <div>
-                 <p className="text-xl font-bold uppercase">{partyName}</p>
-                 <p className="text-sm max-w-md">{partyAddress}</p>
+                 <p className="text-xl font-bold uppercase">{billToName}</p>
+                 <p className="text-sm max-w-md whitespace-pre-wrap">{billToAddress}</p>
               </div>
               <div className="text-right">
-                 <p><span className="font-bold">GST No:</span> {partyGst || 'UNREGISTERED'}</p>
-                 <p><span className="font-bold">Mobile:</span> {partyMobile || 'N/A'}</p>
+                 <p><span className="font-bold">GST No:</span> {billToGst}</p>
+                 <p><span className="font-bold">Mobile:</span> {billToMobile}</p>
               </div>
            </div>
         </div>
@@ -358,60 +393,64 @@ function InvoiceContent() {
               <tr className="bg-black text-white border-b-2 border-black">
                  <th className="p-2 border-r border-white/20 text-xs">DATE</th>
                  <th className="p-2 border-r border-white/20 text-xs">LR NO</th>
+                 <th className="p-2 border-r border-white/20 text-xs">PACKAGES</th>
                  <th className="p-2 border-r border-white/20 text-xs">VEHICLE NO</th>
                  <th className="p-2 border-r border-white/20 text-xs">ROUTE</th>
                  <th className="p-2 border-r border-white/20 text-xs">WT(QTL)</th>
-                 <th className="p-2 border-r border-white/20 text-xs">RATE</th>
-                 <th className="p-2 border-r border-white/20 text-xs">FREIGHT</th>
-                 <th className="p-2 border-r border-white/20 text-xs">UNL.</th>
-                 <th className="p-2 text-xs">AMOUNT</th>
+                 <th className="p-2 border-r border-white/20 text-xs">RATE/QTL</th>
+                 <th className="p-2 border-r border-white/20 text-xs">TOTAL FREIGHT</th>
+                 <th className="p-2 border-r border-white/20 text-xs">UNLOADING</th>
+                 <th className="p-2 text-xs">FINAL AMOUNT</th>
               </tr>
            </thead>
            <tbody className="divide-y divide-black/10">
               {trips.map((trip: any, idx: number) => (
                  <tr key={idx} className="text-sm">
-                    <td className="p-2 border-r border-black/10 text-center">{trip.date}</td>
-                    <td className="p-2 border-r border-black/10 font-bold">{trip.lrNo}</td>
-                    <td className="p-2 border-r border-black/10 font-mono text-xs">{normalizeVehicleNo(trip.vehicleNo)}</td>
-                    <td className="p-2 border-r border-black/10">{trip.source}-{trip.destination}</td>
-                    <td className="p-2 border-r border-black/10 text-center">{trip.weight}</td>
-                    <td className="p-2 border-r border-black/10 text-center">{trip.rateQtl}</td>
-                    <td className="p-2 border-r border-black/10 text-right">₹{Number(trip.totalFreight || 0).toFixed(2)}</td>
-                    <td className="p-2 border-r border-black/10 text-right">₹{Number(trip.unloadingCharges || 0).toFixed(2)}</td>
-                    <td className="p-2 text-right font-bold">₹{Number(trip.totalAmount || 0).toFixed(2)}</td>
+                    <td className="p-2 border-r border-black/10 text-center">{displayInvoiceValue(trip.date)}</td>
+                    <td className="p-2 border-r border-black/10 font-bold">{displayInvoiceValue(trip.lrNo)}</td>
+                    <td className="p-2 border-r border-black/10 text-center">{displayInvoiceValue(trip.packages)}</td>
+                    <td className="p-2 border-r border-black/10 font-mono text-xs">{displayInvoiceValue(normalizeVehicleNo(trip.vehicleNo))}</td>
+                    <td className="p-2 border-r border-black/10">{displayRoute(trip.source, trip.destination)}</td>
+                    <td className="p-2 border-r border-black/10 text-center">{displayInvoiceValue(trip.weight)}</td>
+                    <td className="p-2 border-r border-black/10 text-center">{displayInvoiceValue(trip.rateQtl)}</td>
+                    <td className="p-2 border-r border-black/10 text-right">{displayInvoiceMoney(trip.totalFreight)}</td>
+                    <td className="p-2 border-r border-black/10 text-right">{displayInvoiceMoney(trip.unloadingCharges)}</td>
+                    <td className="p-2 text-right font-bold">{displayInvoiceMoney(getTripFinalAmount(trip))}</td>
                  </tr>
               ))}
               <tr className="h-40 align-top">
-                 <td colSpan={9} className="p-2"></td>
+                 <td colSpan={10} className="p-2"></td>
               </tr>
            </tbody>
            <tfoot>
               <tr className="bg-gray-100 border-t-2 border-black">
-                 <td colSpan={8} className="p-3 text-right font-bold text-lg">GRAND TOTAL</td>
-                 <td className="p-3 text-right font-bold text-xl">₹{printableTotal.toLocaleString()}</td>
+                 <td colSpan={9} className="p-3 text-right font-bold text-lg">GRAND TOTAL</td>
+                 <td className="p-3 text-right font-bold text-xl">{printableTotal > 0 ? `Rs. ${printableTotal.toLocaleString("en-IN")}` : ""}</td>
               </tr>
            </tfoot>
         </table>
 
-        {invoice.notes && (
-          <div className="border-2 border-black p-3 mb-8">
-            <h4 className="font-bold text-xs uppercase mb-1">Notes</h4>
-            <p className="text-sm whitespace-pre-wrap">{invoice.notes}</p>
-          </div>
-        )}
-
         {/* Footer */}
         <div className="grid grid-cols-2 gap-8">
            <div className="border-2 border-black p-4">
+              <h4 className="font-bold text-sm border-b border-black mb-2 pb-1">TOTAL AMOUNT IN WORDS</h4>
+              <p className="text-xs font-bold uppercase italic mb-4">
+                {printableTotal > 0 ? `Rupees ${numberToWords(printableTotal)} Only` : ""}
+              </p>
               <h4 className="font-bold text-sm border-b border-black mb-2 pb-1">BANK SETTLEMENT DETAILS</h4>
               <p className="text-sm"><span className="font-bold">Bank Name:</span> {transporterProfile.bankName}</p>
               <p className="text-sm"><span className="font-bold">A/C No:</span> {transporterProfile.accountNo}</p>
               <p className="text-sm"><span className="font-bold">IFSC Code:</span> {transporterProfile.ifscCode}</p>
               <div className="mt-4 pt-4 border-t border-black">
-                 <p className="text-xs font-bold uppercase italic">Amount in words: Rupees {numberToWords(printableTotal)} Only</p>
+                 <h4 className="font-bold text-xs uppercase mb-1">Notes / Terms</h4>
+                 <p className="text-xs whitespace-pre-wrap">{invoice.notes || "Please verify all LR details before payment. Subject to local jurisdiction."}</p>
               </div>
            </div>
            <div className="text-right flex flex-col justify-end items-end p-4">
+              <div className="border-2 border-black p-3 mb-8 w-full">
+                <p className="text-xs font-bold uppercase">Total Amount</p>
+                <p className="text-2xl font-bold">{printableTotal > 0 ? `Rs. ${printableTotal.toLocaleString("en-IN")}` : ""}</p>
+              </div>
               <p className="font-bold uppercase text-xs mb-16">For {transporterProfile.companyName}</p>
               <p className="font-bold uppercase text-sm border-t-2 border-black pt-2">Authorized Signatory</p>
            </div>

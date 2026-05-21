@@ -12,6 +12,8 @@ import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { Plus, Edit, Trash2, Users, Search, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
@@ -27,7 +29,15 @@ import {
 import { getSubscriptionBlockMessage, isSubscriptionActive } from "@/lib/account-utils";
 import { subscribeToOwnedCollection } from "@/lib/firestore-query-utils";
 
-type PartySortKey = "createdAt" | "partyName" | "gstNo" | "mobile";
+type PartySortKey = "createdAt" | "partyType" | "partyName" | "gstNo" | "mobile";
+
+const PARTY_TYPE_OPTIONS = [
+  { value: "consignor", label: "Consignor" },
+  { value: "consignee", label: "Consignee" },
+];
+
+const getPartyType = (party: any) => party?.partyType === "consignor" ? "consignor" : "consignee";
+const getPartyTypeLabel = (party: any) => getPartyType(party) === "consignor" ? "Consignor" : "Consignee";
 
 export default function PartiesPage() {
   const { profile } = useAuth();
@@ -39,6 +49,7 @@ export default function PartiesPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingParty, setEditingParty] = useState<any>(null);
   const [formData, setFormData] = useState({
+    partyType: "consignee",
     partyName: "",
     gstNo: "",
     mobile: "",
@@ -86,12 +97,17 @@ export default function PartiesPage() {
     if (guardSubscriptionAction()) return;
 
     const partyData = {
+      partyType: normalizeText(formData.partyType) || "consignee",
       partyName: normalizeText(formData.partyName),
       gstNo: normalizeGstNo(formData.gstNo),
       mobile: normalizeText(formData.mobile),
       address: normalizeMultiline(formData.address),
     };
 
+    if (!["consignor", "consignee"].includes(partyData.partyType)) {
+      toast({ title: "Validation Error", description: "Party type is required.", variant: "destructive" });
+      return;
+    }
     if (!partyData.partyName) {
       toast({ title: "Validation Error", description: "Party name is required.", variant: "destructive" });
       return;
@@ -138,7 +154,7 @@ export default function PartiesPage() {
       }
       setIsDialogOpen(false);
       setEditingParty(null);
-      setFormData({ partyName: "", gstNo: "", mobile: "", address: "" });
+      setFormData({ partyType: "consignee", partyName: "", gstNo: "", mobile: "", address: "" });
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
@@ -170,6 +186,7 @@ export default function PartiesPage() {
     const queryText = search.toLowerCase();
     return (
       (p.partyName || "").toLowerCase().includes(queryText) || 
+      getPartyTypeLabel(p).toLowerCase().includes(queryText) ||
       (p.gstNo || "").toLowerCase().includes(queryText) ||
       (p.mobile || "").toLowerCase().includes(queryText)
     );
@@ -177,6 +194,7 @@ export default function PartiesPage() {
 
   const sortedParties = useMemo(() => sortRows(filteredParties, partySort, {
     createdAt: (party) => party.createdAt || party.updatedAt,
+    partyType: (party) => getPartyType(party),
     partyName: (party) => party.partyName,
     gstNo: (party) => party.gstNo,
     mobile: (party) => party.mobile,
@@ -192,7 +210,7 @@ export default function PartiesPage() {
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button
-              onClick={() => { setEditingParty(null); setFormData({ partyName: "", gstNo: "", mobile: "", address: "" }); }}
+              onClick={() => { setEditingParty(null); setFormData({ partyType: "consignee", partyName: "", gstNo: "", mobile: "", address: "" }); }}
               disabled={!subscriptionActive}
               title={!subscriptionActive ? subscriptionBlockMessage : "Add New Party"}
               className="bg-gradient-primary h-11 px-6 font-bold"
@@ -205,6 +223,19 @@ export default function PartiesPage() {
               <DialogTitle className="text-2xl font-headline font-bold">{editingParty ? "Edit Party" : "Add Party"}</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSave} className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <Label>Party Type</Label>
+                <Select value={formData.partyType} onValueChange={value => setFormData({ ...formData, partyType: value })}>
+                  <SelectTrigger className="bg-secondary/50">
+                    <SelectValue placeholder="Select party type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PARTY_TYPE_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-2">
                 <Label>Party Name</Label>
                 <Input required value={formData.partyName} onChange={e => setFormData({ ...formData, partyName: e.target.value })} placeholder="Company / Individual Name" />
@@ -260,7 +291,8 @@ export default function PartiesPage() {
           ) : (
             <Table>
               <TableHeader className="bg-secondary/50">
-                <TableRow>
+                  <TableRow>
+                  <SortableTableHead active={partySort.key === "partyType"} direction={partySort.direction} onSort={() => handlePartySort("partyType")}>Party Type</SortableTableHead>
                   <SortableTableHead active={partySort.key === "partyName"} direction={partySort.direction} onSort={() => handlePartySort("partyName")}>Party Name</SortableTableHead>
                   <SortableTableHead active={partySort.key === "gstNo"} direction={partySort.direction} onSort={() => handlePartySort("gstNo")}>GST No</SortableTableHead>
                   <SortableTableHead active={partySort.key === "mobile"} direction={partySort.direction} onSort={() => handlePartySort("mobile")}>Mobile</SortableTableHead>
@@ -271,13 +303,21 @@ export default function PartiesPage() {
               <TableBody>
                 {sortedParties.map((party) => (
                   <TableRow key={party.id} className="hover:bg-secondary/30 transition-colors">
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className={getPartyType(party) === "consignor" ? "bg-blue-500/10 text-blue-500 border-blue-500/20" : "bg-green-500/10 text-green-500 border-green-500/20"}
+                      >
+                        {getPartyTypeLabel(party)}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="font-bold text-primary">{party.partyName}</TableCell>
                     <TableCell className="text-sm font-mono">{party.gstNo || "N/A"}</TableCell>
                     <TableCell className="text-sm">{party.mobile || "N/A"}</TableCell>
                     <TableCell className="text-xs max-w-[200px] truncate">{party.address || "N/A"}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Button size="icon" variant="ghost" className="text-blue-500" disabled={!subscriptionActive} title={!subscriptionActive ? subscriptionBlockMessage : "Edit"} onClick={() => { setEditingParty(party); setFormData({ partyName: party.partyName || "", gstNo: party.gstNo || "", mobile: party.mobile || "", address: party.address || "" }); setIsDialogOpen(true); }}>
+                        <Button size="icon" variant="ghost" className="text-blue-500" disabled={!subscriptionActive} title={!subscriptionActive ? subscriptionBlockMessage : "Edit"} onClick={() => { setEditingParty(party); setFormData({ partyType: getPartyType(party), partyName: party.partyName || "", gstNo: party.gstNo || "", mobile: party.mobile || "", address: party.address || "" }); setIsDialogOpen(true); }}>
                           <Edit className="w-4 h-4" />
                         </Button>
                         <Button size="icon" variant="ghost" className="text-destructive" disabled={!subscriptionActive} title={!subscriptionActive ? subscriptionBlockMessage : "Delete"} onClick={() => handleDelete(party.id)}>

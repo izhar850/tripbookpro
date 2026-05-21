@@ -31,8 +31,6 @@ import Link from "next/link";
 
 import { cn } from "@/lib/utils";
 import {
-  isOptionalNumeric,
-  isRequiredNumeric,
   isValidDateInput,
   isValidMobile,
   nextSortDirection,
@@ -71,7 +69,12 @@ import {
 } from "@/lib/account-utils";
 import { subscribeToOwnedCollection } from "@/lib/firestore-query-utils";
 
-type TripSortKey = "date" | "lrNo" | "status" | "partyName" | "vehicleNo" | "totalAmount";
+type TripSortKey = "date" | "lrNo" | "status" | "consignorName" | "consigneeName" | "vehicleNo" | "totalAmount";
+
+const VEHICLE_TYPE_OPTIONS = ["single axle", "multi axle"];
+const getPartyType = (party: any) => party?.partyType === "consignor" ? "consignor" : "consignee";
+const getTripConsignorName = (trip: any) => trip?.consignorName || "";
+const getTripConsigneeName = (trip: any) => trip?.consigneeName || trip?.partyName || "";
 
 export default function Dashboard() {
   const { profile, db } = useAuth();
@@ -88,11 +91,13 @@ export default function Dashboard() {
   const [isQuickPartyOpen, setIsQuickPartyOpen] = useState(false);
   const [savingQuickParty, setSavingQuickParty] = useState(false);
   const [quickPartyData, setQuickPartyData] = useState({
+    partyType: "consignee",
     partyName: "",
     gstNo: "",
     mobile: "",
     address: "",
   });
+  const [quickPartyTarget, setQuickPartyTarget] = useState<"consignor" | "consignee">("consignee");
   const [isQuickVehicleOpen, setIsQuickVehicleOpen] = useState(false);
   const [savingQuickVehicle, setSavingQuickVehicle] = useState(false);
   const [isPlansOpen, setIsPlansOpen] = useState(false);
@@ -132,6 +137,8 @@ export default function Dashboard() {
     lrNo: "",
     date: "",
     partyId: "",
+    consignorPartyId: "",
+    consigneePartyId: "",
     vehicleId: "",
     vehicleNo: "",
     vehicleType: "",
@@ -147,7 +154,7 @@ export default function Dashboard() {
     unloadingCharges: "",
     advance: "",
     remark: "",
-    gstPayBy: "transporter",
+    gstPayBy: "",
     notes: ""
   });
 
@@ -234,12 +241,29 @@ export default function Dashboard() {
   const partyData = useMemo(() => {
     const partyStats: { [key: string]: number } = {};
     trips.forEach(t => {
-      partyStats[t.partyName] = (partyStats[t.partyName] || 0) + (Number(t.totalAmount) || 0);
+      const partyName = getTripConsigneeName(t);
+      if (!partyName) return;
+      partyStats[partyName] = (partyStats[partyName] || 0) + (Number(t.totalAmount) || 0);
     });
     return Object.keys(partyStats).map(name => ({ name, value: partyStats[name] }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 5);
   }, [trips]);
+
+  const consignorParties = useMemo(() => parties.filter((party) => getPartyType(party) === "consignor"), [parties]);
+  const consigneeParties = useMemo(() => parties.filter((party) => getPartyType(party) === "consignee"), [parties]);
+
+  const openQuickPartyModal = (partyType: "consignor" | "consignee") => {
+    setQuickPartyTarget(partyType);
+    setQuickPartyData({
+      partyType,
+      partyName: "",
+      gstNo: "",
+      mobile: "",
+      address: "",
+    });
+    setIsQuickPartyOpen(true);
+  };
 
   const totals = useMemo(() => {
     const weight = Number(formData.weight) || 0;
@@ -365,6 +389,8 @@ export default function Dashboard() {
     lrNo: normalizeText(formData.lrNo).toUpperCase(),
     date: normalizeText(formData.date),
     partyId: normalizeText(formData.partyId),
+    consignorPartyId: normalizeText(formData.consignorPartyId),
+    consigneePartyId: normalizeText(formData.consigneePartyId),
     vehicleId: normalizeText(formData.vehicleId),
     vehicleNo: normalizeVehicleNo(formData.vehicleNo),
     vehicleType: normalizeText(formData.vehicleType),
@@ -384,19 +410,8 @@ export default function Dashboard() {
     notes: normalizeMultiline(formData.notes),
   });
 
-  const validateTripForm = (data: ReturnType<typeof getCleanTripFormData>) => {
-    if (!data.lrNo) return "LR number is required.";
-    if (!data.date) return "Trip date is required.";
-    if (!isValidDateInput(data.date)) return "Trip date is not valid.";
-    if (!data.partyId) return "Please select a party.";
-    if (!data.vehicleId) return "Please select a vehicle.";
-    if (!data.source) return "Source is required.";
-    if (!data.destination) return "Destination is required.";
-    if (!isRequiredNumeric(data.packages)) return "Packages is required and must be numeric.";
-    if (!isRequiredNumeric(data.weight)) return "Weight is required and must be numeric.";
-    if (!isRequiredNumeric(data.rateQtl)) return "Rate/Qtl is required and must be numeric.";
-    if (!isOptionalNumeric(data.advance)) return "Advance must be numeric when entered.";
-    if (!isOptionalNumeric(data.unloadingCharges)) return "Unloading charges must be numeric when entered.";
+  const validateTripForm = (_data: ReturnType<typeof getCleanTripFormData>) => {
+    // Trip entry intentionally allows blank LR copies, so no save-time field validation is applied here.
     return "";
   };
 
@@ -406,6 +421,7 @@ export default function Dashboard() {
     if (guardSubscriptionAction()) return;
 
     const partyData = {
+      partyType: quickPartyTarget,
       partyName: normalizeText(quickPartyData.partyName),
       gstNo: normalizeGstNo(quickPartyData.gstNo),
       mobile: normalizeText(quickPartyData.mobile),
@@ -433,8 +449,13 @@ export default function Dashboard() {
       const createdParty = { id: partyRef.id, ...data };
 
       setParties((current) => current.some((p) => p.id === partyRef.id) ? current : [...current, createdParty]);
-      setFormData((current) => ({ ...current, partyId: partyRef.id }));
-      setQuickPartyData({ partyName: "", gstNo: "", mobile: "", address: "" });
+      setFormData((current) => ({
+        ...current,
+        ...(quickPartyTarget === "consignor"
+          ? { consignorPartyId: partyRef.id }
+          : { consigneePartyId: partyRef.id, partyId: partyRef.id }),
+      }));
+      setQuickPartyData({ partyType: "consignee", partyName: "", gstNo: "", mobile: "", address: "" });
       setIsQuickPartyOpen(false);
       toast({ title: "Party Added", description: `${partyData.partyName} selected for this trip.` });
     } catch (error: any) {
@@ -566,7 +587,7 @@ export default function Dashboard() {
     }
 
     try {
-      const duplicateLrNo = await findDuplicateLrNo(cleanedFormData.lrNo);
+      const duplicateLrNo = cleanedFormData.lrNo ? await findDuplicateLrNo(cleanedFormData.lrNo) : null;
       if (duplicateLrNo) {
         showValidationError("LR number already exists for this company.");
         return;
@@ -576,21 +597,33 @@ export default function Dashboard() {
       return;
     }
 
-    const selectedParty = parties.find(p => p.id === cleanedFormData.partyId);
-    if (!selectedParty) {
-      toast({ title: "Select Party", description: "Please select a party for this trip.", variant: "destructive" });
-      return;
-    }
+    const selectedConsignor = parties.find(p => p.id === cleanedFormData.consignorPartyId);
+    const selectedConsignee = parties.find(p => p.id === cleanedFormData.consigneePartyId);
 
     const selectedVehicle = vehicles.find(v => v.id === cleanedFormData.vehicleId);
-    if (!selectedVehicle && !cleanedFormData.vehicleNo) {
-      toast({ title: "Select Vehicle", description: "Please select a valid vehicle for this trip.", variant: "destructive" });
-      return;
-    }
     const tripFormData = {
       ...cleanedFormData,
+      partyId: selectedConsignee?.id || cleanedFormData.partyId,
       vehicleNo: normalizeVehicleNo(selectedVehicle?.vehicleNo || cleanedFormData.vehicleNo),
       vehicleType: normalizeText(selectedVehicle?.type || cleanedFormData.vehicleType),
+    };
+
+    const partySnapshot = {
+      consignorPartyId: selectedConsignor?.id || cleanedFormData.consignorPartyId,
+      consignorName: selectedConsignor?.partyName || "",
+      consignorGst: selectedConsignor?.gstNo || "",
+      consignorMobile: selectedConsignor?.mobile || "",
+      consignorAddress: selectedConsignor?.address || "",
+      consigneePartyId: selectedConsignee?.id || cleanedFormData.consigneePartyId,
+      consigneeName: selectedConsignee?.partyName || "",
+      consigneeGst: selectedConsignee?.gstNo || "",
+      consigneeMobile: selectedConsignee?.mobile || "",
+      consigneeAddress: selectedConsignee?.address || "",
+      partyId: selectedConsignee?.id || cleanedFormData.partyId,
+      partyName: selectedConsignee?.partyName || "",
+      partyGst: selectedConsignee?.gstNo || "",
+      partyAddress: selectedConsignee?.address || "",
+      partyMobile: selectedConsignee?.mobile || "",
     };
 
     const { totalFreight, totalAmount, balance } = totals;
@@ -639,10 +672,7 @@ export default function Dashboard() {
             companyAddress: profile.address || "",
             companyGst: profile.gstNo || "",
             companyMobile: profile.mobile || "",
-            partyName: selectedParty.partyName,
-            partyGst: selectedParty.gstNo || "",
-            partyAddress: selectedParty.address || "",
-            partyMobile: selectedParty.mobile || "",
+            ...partySnapshot,
             updatedAt: serverTimestamp(),
             // If payment is complete, sync trip status
             ...(paymentStatus === "Paid" ? { status: "Paid", statusUpdatedAt: serverTimestamp() } : {})
@@ -670,9 +700,11 @@ export default function Dashboard() {
           }
 
           const suggestedLrNo = formatLrNo(nextLrNo);
-          const lrNo = tripFormData.lrNo || suggestedLrNo;
+          const lrNo = tripFormData.lrNo;
           const manualSequence = getSequentialLrNumber(lrNo);
-          const nextCounterValue = Math.max(lastLrNo, manualSequence || (lrNo === suggestedLrNo ? nextLrNo : lastLrNo));
+          const nextCounterValue = lrNo
+            ? Math.max(lastLrNo, manualSequence || (lrNo === suggestedLrNo ? nextLrNo : lastLrNo))
+            : lastLrNo;
 
           transaction.set(newTripRef, {
             ...tripFormData,
@@ -684,10 +716,7 @@ export default function Dashboard() {
             companyGst: profile.gstNo || "",
             companyMobile: profile.mobile || "",
             ownerName: profile.ownerName,
-            partyName: selectedParty.partyName,
-            partyGst: selectedParty.gstNo || "",
-            partyAddress: selectedParty.address || "",
-            partyMobile: selectedParty.mobile || "",
+            ...partySnapshot,
             lrNo,
             billed: false,
             billNo: "",
@@ -729,6 +758,8 @@ export default function Dashboard() {
       lrNo: "",
       date: new Date().toISOString().split('T')[0],
       partyId: "",
+      consignorPartyId: "",
+      consigneePartyId: "",
       vehicleId: "",
       vehicleNo: "",
       vehicleType: "",
@@ -744,7 +775,7 @@ export default function Dashboard() {
       unloadingCharges: "",
       advance: "",
       remark: "",
-      gstPayBy: "transporter",
+      gstPayBy: "",
       notes: ""
     });
   };
@@ -773,7 +804,9 @@ export default function Dashboard() {
     setFormData({
       lrNo: normalizeText(trip.lrNo).toUpperCase(),
       date: trip.date,
-      partyId: trip.partyId,
+      partyId: trip.consigneePartyId || trip.partyId || "",
+      consignorPartyId: trip.consignorPartyId || "",
+      consigneePartyId: trip.consigneePartyId || trip.partyId || "",
       vehicleId: trip.vehicleId || "",
       vehicleNo: normalizeVehicleNo(trip.vehicleNo),
       vehicleType: trip.vehicleType,
@@ -789,7 +822,7 @@ export default function Dashboard() {
       unloadingCharges: (trip.unloadingCharges || 0).toString(),
       advance: (trip.advance || 0).toString(),
       remark: trip.remark || "",
-      gstPayBy: trip.gstPayBy,
+      gstPayBy: trip.gstPayBy || "",
       notes: trip.notes || ""
     });
     setIsSheetOpen(true);
@@ -799,6 +832,8 @@ export default function Dashboard() {
     const queryStr = searchQuery.toLowerCase();
     const matchesSearch = (
       trip.lrNo?.toLowerCase().includes(queryStr) ||
+      getTripConsignorName(trip).toLowerCase().includes(queryStr) ||
+      getTripConsigneeName(trip).toLowerCase().includes(queryStr) ||
       trip.partyName?.toLowerCase().includes(queryStr) ||
       normalizeVehicleNo(trip.vehicleNo).toLowerCase().includes(queryStr) ||
       trip.source?.toLowerCase().includes(queryStr) ||
@@ -818,7 +853,8 @@ export default function Dashboard() {
     date: (trip) => trip.createdAt || trip.date,
     lrNo: (trip) => trip.lrNo,
     status: (trip) => trip.status || trip.paymentStatus,
-    partyName: (trip) => trip.partyName,
+    consignorName: (trip) => getTripConsignorName(trip),
+    consigneeName: (trip) => getTripConsigneeName(trip),
     vehicleNo: (trip) => normalizeVehicleNo(trip.vehicleNo),
     totalAmount: (trip) => Number(trip.totalAmount || trip.totalFreight || 0),
   }), [filteredTrips, tripSort]);
@@ -941,33 +977,57 @@ export default function Dashboard() {
                   <Input
                     value={formData.lrNo}
                     onChange={e => setFormData({ ...formData, lrNo: e.target.value.toUpperCase() })}
-                    required
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>Date</Label>
-                  <Input type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} required />
+                  <Input type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} />
                 </div>
-                <div className="space-y-2 sm:col-span-2">
+                <div className="space-y-2">
                   <div className="flex items-center justify-between gap-2">
-                    <Label>Party (Client)</Label>
+                    <Label>Consignor Party</Label>
                     <Button
                       type="button"
                       size="sm"
                       variant="outline"
                       disabled={!subscriptionActive}
                       className="h-7 px-2 text-xs font-bold"
-                      onClick={() => setIsQuickPartyOpen(true)}
+                      onClick={() => openQuickPartyModal("consignor")}
                     >
-                      <Plus className="mr-1 h-3 w-3" /> Add Party
+                      <Plus className="mr-1 h-3 w-3" /> Add Consignor
                     </Button>
                   </div>
-                  <Select value={formData.partyId} onValueChange={val => setFormData({ ...formData, partyId: val })}>
+                  <Select value={formData.consignorPartyId} onValueChange={val => setFormData({ ...formData, consignorPartyId: val })}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select Client" />
+                      <SelectValue placeholder="Select consignor" />
                     </SelectTrigger>
                     <SelectContent>
-                      {parties.map(p => (
+                      {consignorParties.map(p => (
+                        <SelectItem key={p.id} value={p.id}>{p.partyName}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label>Consignee Party</Label>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={!subscriptionActive}
+                      className="h-7 px-2 text-xs font-bold"
+                      onClick={() => openQuickPartyModal("consignee")}
+                    >
+                      <Plus className="mr-1 h-3 w-3" /> Add Consignee
+                    </Button>
+                  </div>
+                  <Select value={formData.consigneePartyId} onValueChange={val => setFormData({ ...formData, consigneePartyId: val, partyId: val })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select consignee" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {consigneeParties.map(p => (
                         <SelectItem key={p.id} value={p.id}>{p.partyName}</SelectItem>
                       ))}
                     </SelectContent>
@@ -1017,6 +1077,22 @@ export default function Dashboard() {
                 </Select>
               </div>
 
+              <div className="space-y-2">
+                <Label>Vehicle Type</Label>
+                <Select value={formData.vehicleType} onValueChange={val => setFormData({ ...formData, vehicleType: val })}>
+                  <SelectTrigger className="bg-secondary/30">
+                    <SelectValue placeholder="Select vehicle type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {formData.vehicleType && !VEHICLE_TYPE_OPTIONS.includes(formData.vehicleType) && (
+                      <SelectItem value={formData.vehicleType}>{formData.vehicleType}</SelectItem>
+                    )}
+                    <SelectItem value="single axle">Single Axle</SelectItem>
+                    <SelectItem value="multi axle">Multi Axle</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* Driver selection removed from the active trip workflow; legacy Firestore driver fields are left untouched. */}
 
               <div className="grid grid-cols-3 gap-4">
@@ -1037,27 +1113,27 @@ export default function Dashboard() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Packages</Label>
-                  <Input type="number" placeholder="Qty" value={formData.packages} onChange={e => setFormData({ ...formData, packages: e.target.value })} required />
+                  <Input type="number" placeholder="Qty" value={formData.packages} onChange={e => setFormData({ ...formData, packages: e.target.value })} />
                 </div>
                 <div className="space-y-2">
                   <Label>Weight (Qtl)</Label>
-                  <Input type="number" step="0.01" placeholder="Wt" value={formData.weight} onChange={e => setFormData({ ...formData, weight: e.target.value })} required />
+                  <Input type="number" step="0.01" placeholder="Wt" value={formData.weight} onChange={e => setFormData({ ...formData, weight: e.target.value })} />
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Label>Goods Description</Label>
-                <Input placeholder="Cement Bags / Iron Rods" value={formData.goodsDescription} onChange={e => setFormData({ ...formData, goodsDescription: e.target.value })} required />
+                <Input placeholder="Cement Bags / Iron Rods" value={formData.goodsDescription} onChange={e => setFormData({ ...formData, goodsDescription: e.target.value })} />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Source (From)</Label>
-                  <Input placeholder="City" value={formData.source} onChange={e => setFormData({ ...formData, source: e.target.value })} required />
+                  <Input placeholder="City" value={formData.source} onChange={e => setFormData({ ...formData, source: e.target.value })} />
                 </div>
                 <div className="space-y-2">
                   <Label>Destination (To)</Label>
-                  <Input placeholder="City" value={formData.destination} onChange={e => setFormData({ ...formData, destination: e.target.value })} required />
+                  <Input placeholder="City" value={formData.destination} onChange={e => setFormData({ ...formData, destination: e.target.value })} />
                 </div>
               </div>
 
@@ -1066,7 +1142,7 @@ export default function Dashboard() {
               <div className="grid grid-cols-2 gap-4 p-4 bg-secondary/30 rounded-xl">
                 <div className="space-y-2">
                   <Label>Rate (per Qtl)</Label>
-                  <Input type="number" value={formData.rateQtl} onChange={e => setFormData({ ...formData, rateQtl: e.target.value })} required />
+                  <Input type="number" value={formData.rateQtl} onChange={e => setFormData({ ...formData, rateQtl: e.target.value })} />
                 </div>
                 <div className="space-y-2">
                   <Label>Unloading</Label>
@@ -1078,14 +1154,15 @@ export default function Dashboard() {
                 </div>
                 <div className="space-y-2">
                   <Label>GST By</Label>
-                  <Select value={formData.gstPayBy} onValueChange={val => setFormData({ ...formData, gstPayBy: val })}>
+                  <Select value={formData.gstPayBy || "blank"} onValueChange={val => setFormData({ ...formData, gstPayBy: val === "blank" ? "" : val })}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="blank">Blank</SelectItem>
                       <SelectItem value="transporter">Transporter</SelectItem>
                       <SelectItem value="consignee">Consignee</SelectItem>
-                      <SelectItem value="consigner">Consigner</SelectItem>
+                      <SelectItem value="consignor">Consignor</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1170,9 +1247,26 @@ export default function Dashboard() {
       <Dialog open={isQuickPartyOpen} onOpenChange={setIsQuickPartyOpen}>
         <DialogContent className="sm:max-w-md bg-card border-border/50">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-headline font-bold">Quick Add Party</DialogTitle>
+            <DialogTitle className="text-2xl font-headline font-bold">
+              Quick Add {quickPartyTarget === "consignor" ? "Consignor" : "Consignee"}
+            </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSaveQuickParty} className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label>Party Type</Label>
+              <Select value={quickPartyTarget} onValueChange={(value: "consignor" | "consignee") => {
+                setQuickPartyTarget(value);
+                setQuickPartyData({ ...quickPartyData, partyType: value });
+              }}>
+                <SelectTrigger className="bg-secondary/50">
+                  <SelectValue placeholder="Select party type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="consignor">Consignor</SelectItem>
+                  <SelectItem value="consignee">Consignee</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2">
               <Label>Party Name</Label>
               <Input
@@ -1232,12 +1326,18 @@ export default function Dashboard() {
               </div>
               <div className="space-y-2">
                 <Label>Vehicle Type</Label>
-                <Input
-                  required
-                  value={quickVehicleData.type}
-                  onChange={e => setQuickVehicleData({ ...quickVehicleData, type: e.target.value })}
-                  placeholder="e.g. 10 Wheeler, Container"
-                />
+                <Select value={quickVehicleData.type} onValueChange={value => setQuickVehicleData({ ...quickVehicleData, type: value })}>
+                  <SelectTrigger className="bg-secondary/50">
+                    <SelectValue placeholder="Select vehicle type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {quickVehicleData.type && !VEHICLE_TYPE_OPTIONS.includes(quickVehicleData.type) && (
+                      <SelectItem value={quickVehicleData.type}>{quickVehicleData.type}</SelectItem>
+                    )}
+                    <SelectItem value="single axle">Single Axle</SelectItem>
+                    <SelectItem value="multi axle">Multi Axle</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label>Owner Name</Label>
@@ -1477,9 +1577,10 @@ export default function Dashboard() {
                     <TableRow>
                     <SortableTableHead active={tripSort.key === "date"} direction={tripSort.direction} onSort={() => handleTripSort("date")}>Date</SortableTableHead>
                     <SortableTableHead active={tripSort.key === "lrNo"} direction={tripSort.direction} onSort={() => handleTripSort("lrNo")}>LR No</SortableTableHead>
+                    <SortableTableHead active={tripSort.key === "consignorName"} direction={tripSort.direction} onSort={() => handleTripSort("consignorName")}>Consignor</SortableTableHead>
+                    <SortableTableHead active={tripSort.key === "consigneeName"} direction={tripSort.direction} onSort={() => handleTripSort("consigneeName")}>Consignee</SortableTableHead>
                     <SortableTableHead active={tripSort.key === "status"} direction={tripSort.direction} onSort={() => handleTripSort("status")}>Trip Status</SortableTableHead>
                     <TableHead className="font-bold">Payment</TableHead>
-                    <SortableTableHead active={tripSort.key === "partyName"} direction={tripSort.direction} onSort={() => handleTripSort("partyName")}>Party</SortableTableHead>
                     <SortableTableHead active={tripSort.key === "vehicleNo"} direction={tripSort.direction} onSort={() => handleTripSort("vehicleNo")}>Vehicle</SortableTableHead>
                     <TableHead className="font-bold">Route</TableHead>
                     <SortableTableHead active={tripSort.key === "totalAmount"} direction={tripSort.direction} onSort={() => handleTripSort("totalAmount")} align="right">Amount</SortableTableHead>
@@ -1505,6 +1606,8 @@ export default function Dashboard() {
                             )}
                           </div>
                         </TableCell>
+                        <TableCell className="font-medium truncate max-w-[140px]">{getTripConsignorName(trip)}</TableCell>
+                        <TableCell className="font-medium truncate max-w-[140px]">{getTripConsigneeName(trip)}</TableCell>
                         <TableCell>
                           <Select 
                             value={trip.status || "Pending"} 
@@ -1539,7 +1642,6 @@ export default function Dashboard() {
                             <span className="text-[10px] text-muted-foreground">₹{trip.paidAmount || 0} / ₹{trip.totalAmount}</span>
                           </div>
                         </TableCell>
-                        <TableCell className="font-medium truncate max-w-[150px]">{trip.partyName}</TableCell>
                         <TableCell className="text-xs font-mono">{normalizeVehicleNo(trip.vehicleNo)}</TableCell>
                         <TableCell className="text-xs">{trip.source} → {trip.destination}</TableCell>
                         <TableCell className="text-right font-bold">₹{Number(trip.totalAmount || 0).toLocaleString()}</TableCell>
@@ -1635,7 +1737,7 @@ export default function Dashboard() {
               <Wallet className="w-6 h-6 text-primary" /> Record Payment
             </DialogTitle>
             <CardDescription>
-              Trip: {selectedTripForPayment?.lrNo} | Party: {selectedTripForPayment?.partyName}
+              Trip: {selectedTripForPayment?.lrNo} | Consignee: {getTripConsigneeName(selectedTripForPayment)}
             </CardDescription>
           </DialogHeader>
           <form onSubmit={handleRecordPayment} className="space-y-4 pt-4">

@@ -30,6 +30,8 @@ import { subscribeToOwnedCollection } from "@/lib/firestore-query-utils";
 
 type VehicleSortKey = "createdAt" | "vehicleNo" | "type" | "status";
 
+const VEHICLE_TYPE_OPTIONS = ["single axle", "multi axle"];
+
 export default function VehiclesPage() {
   const { profile } = useAuth();
   const { toast } = useToast();
@@ -244,7 +246,18 @@ export default function VehiclesPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Vehicle Type</Label>
-                  <Input required value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })} placeholder="e.g. 10 Wheeler, Container" />
+                  <Select value={formData.type} onValueChange={value => setFormData({ ...formData, type: value })}>
+                    <SelectTrigger className="bg-secondary/50">
+                      <SelectValue placeholder="Select vehicle type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {formData.type && !VEHICLE_TYPE_OPTIONS.includes(formData.type) && (
+                        <SelectItem value={formData.type}>{formData.type}</SelectItem>
+                      )}
+                      <SelectItem value="single axle">Single Axle</SelectItem>
+                      <SelectItem value="multi axle">Multi Axle</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>Owner Name</Label>
@@ -253,14 +266,6 @@ export default function VehiclesPage() {
                 <div className="space-y-2">
                   <Label>Capacity (Tons)</Label>
                   <Input required type="number" value={formData.capacity} onChange={e => setFormData({ ...formData, capacity: e.target.value })} placeholder="e.g. 15" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Size (L x W x H in ft)</Label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <Input placeholder="L" value={formData.sizeL} onChange={e => setFormData({ ...formData, sizeL: e.target.value })} />
-                    <Input placeholder="W" value={formData.sizeW} onChange={e => setFormData({ ...formData, sizeW: e.target.value })} />
-                    <Input placeholder="H" value={formData.sizeH} onChange={e => setFormData({ ...formData, sizeH: e.target.value })} />
-                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Status</Label>
@@ -342,7 +347,6 @@ export default function VehiclesPage() {
                   <TableRow>
                     <SortableTableHead active={vehicleSort.key === "vehicleNo"} direction={vehicleSort.direction} onSort={() => handleVehicleSort("vehicleNo")}>Vehicle No</SortableTableHead>
                     <SortableTableHead active={vehicleSort.key === "type"} direction={vehicleSort.direction} onSort={() => handleVehicleSort("type")}>Type & Capacity</SortableTableHead>
-                    <TableHead className="font-bold">Dimensions (ft)</TableHead>
                     <TableHead className="font-bold">Owner</TableHead>
                     <SortableTableHead active={vehicleSort.key === "status"} direction={vehicleSort.direction} onSort={() => handleVehicleSort("status")} align="center">Status</SortableTableHead>
                     <TableHead className="font-bold text-right">Actions</TableHead>
@@ -362,9 +366,6 @@ export default function VehiclesPage() {
                           <span>{vehicle.type}</span>
                           <span className="text-xs text-muted-foreground">{vehicle.capacity} Tons</span>
                         </div>
-                      </TableCell>
-                      <TableCell className="text-sm font-mono text-xs">
-                        {vehicle.sizeL || "-"}{" x "}{vehicle.sizeW || "-"}{" x "}{vehicle.sizeH || "-"}
                       </TableCell>
                       <TableCell className="text-sm">{vehicle.ownerName}</TableCell>
                       <TableCell className="text-center">

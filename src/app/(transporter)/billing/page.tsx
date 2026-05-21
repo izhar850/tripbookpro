@@ -29,6 +29,10 @@ import { getSubscriptionBlockMessage, isSubscriptionActive } from "@/lib/account
 
 type BillingSortKey = "date" | "billNo" | "lrNo" | "partyName" | "vehicleNo" | "status" | "totalAmount";
 
+const getPartyType = (party: any) => party?.partyType === "consignor" ? "consignor" : "consignee";
+const getTripBillingPartyId = (trip: any) => trip?.consigneePartyId || trip?.partyId || "";
+const getTripBillingPartyName = (trip: any) => trip?.consigneeName || trip?.partyName || "";
+
 export default function BillingPage() {
   const { profile } = useAuth();
   const { toast } = useToast();
@@ -102,20 +106,20 @@ export default function BillingPage() {
   }, [profile, viewStatus]);
 
   const partiesWithTrips = useMemo(() => {
-    const partyIdsInTrips = new Set(trips.map(t => t.partyId));
-    return parties.filter(p => partyIdsInTrips.has(p.id));
+    const partyIdsInTrips = new Set(trips.map(t => getTripBillingPartyId(t)));
+    return parties.filter(p => getPartyType(p) === "consignee" && partyIdsInTrips.has(p.id));
   }, [parties, trips]);
 
   const currentTrips = useMemo(() => {
     if (!selectedPartyId || selectedPartyId === "none") return trips;
-    return trips.filter(t => t.partyId === selectedPartyId);
+    return trips.filter(t => getTripBillingPartyId(t) === selectedPartyId);
   }, [trips, selectedPartyId]);
 
   const sortedCurrentTrips = useMemo(() => sortRows(currentTrips, billingSort, {
     date: (trip) => trip.createdAt || trip.date,
     billNo: (trip) => trip.billNo,
     lrNo: (trip) => trip.lrNo,
-    partyName: (trip) => trip.partyName,
+    partyName: (trip) => getTripBillingPartyName(trip),
     vehicleNo: (trip) => normalizeVehicleNo(trip.vehicleNo),
     status: (trip) => trip.status || trip.paymentStatus,
     totalAmount: (trip) => Number(trip.totalAmount || trip.totalFreight || 0),
@@ -156,7 +160,7 @@ export default function BillingPage() {
     setExporting(true);
     try {
       const headers = [
-        "Bill No", "LR No", "Date", "Party Name", "Vehicle No", 
+        "Bill No", "LR No", "Date", "Consignee Name", "Vehicle No", 
         "Source", "Destination", "Packages", "Weight", "Rate/Qtl", 
         "Total Freight", "Advance", "Balance", "GST Pay By"
       ];
@@ -165,7 +169,7 @@ export default function BillingPage() {
         t.billNo || "",
         t.lrNo || "",
         t.date || "",
-        t.partyName || "",
+        getTripBillingPartyName(t),
         normalizeVehicleNo(t.vehicleNo),
         t.source || "",
         t.destination || "",
@@ -214,7 +218,7 @@ export default function BillingPage() {
     if (guardSubscriptionAction()) return;
     setGenerating(true);
 
-    const party = parties.find(p => p.id === selectedPartyId);
+    const party = parties.find(p => p.id === selectedPartyId && getPartyType(p) === "consignee");
     if (!party) return;
 
     try {
@@ -239,6 +243,7 @@ export default function BillingPage() {
           userId: profile.uid,
           billNo,
           partyId: selectedPartyId,
+          billingPartyType: "consignee",
           partyName: party.partyName,
           partyGst: party.gstNo || "",
           partyAddress: party.address || "",
@@ -328,7 +333,7 @@ export default function BillingPage() {
               <CardTitle className="text-lg flex items-center gap-2">
                 <Users className="w-5 h-5 text-primary" /> Party Filter
               </CardTitle>
-              <CardDescription>Filter records by client</CardDescription>
+              <CardDescription>Filter records by consignee</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <Select value={selectedPartyId} onValueChange={(val) => { setSelectedPartyId(val); setSelectedTripIds([]); }}>
@@ -433,7 +438,7 @@ export default function BillingPage() {
                         )}
                         <SortableTableHead active={billingSort.key === "date"} direction={billingSort.direction} onSort={() => handleBillingSort("date")}>Date</SortableTableHead>
                         <SortableTableHead active={billingSort.key === "lrNo"} direction={billingSort.direction} onSort={() => handleBillingSort("lrNo")}>LR No</SortableTableHead>
-                        <SortableTableHead active={billingSort.key === "partyName"} direction={billingSort.direction} onSort={() => handleBillingSort("partyName")}>Party</SortableTableHead>
+                        <SortableTableHead active={billingSort.key === "partyName"} direction={billingSort.direction} onSort={() => handleBillingSort("partyName")}>Consignee</SortableTableHead>
                         <SortableTableHead active={billingSort.key === "vehicleNo"} direction={billingSort.direction} onSort={() => handleBillingSort("vehicleNo")}>Vehicle</SortableTableHead>
                         <SortableTableHead active={billingSort.key === "status"} direction={billingSort.direction} onSort={() => handleBillingSort("status")}>Status</SortableTableHead>
                         <TableHead className="font-bold">Route</TableHead>
@@ -458,7 +463,7 @@ export default function BillingPage() {
                           {viewStatus === "billed" && <TableCell className="font-mono text-xs">{trip.billNo}</TableCell>}
                           <TableCell className="text-xs whitespace-nowrap">{trip.date}</TableCell>
                           <TableCell className="font-bold text-primary">{trip.lrNo}</TableCell>
-                          <TableCell className="text-sm truncate max-w-[120px]">{trip.partyName}</TableCell>
+                          <TableCell className="text-sm truncate max-w-[120px]">{getTripBillingPartyName(trip)}</TableCell>
                           <TableCell className="text-xs font-mono">{normalizeVehicleNo(trip.vehicleNo)}</TableCell>
                           <TableCell className="text-xs">{trip.status || trip.paymentStatus || "Pending"}</TableCell>
                           <TableCell className="text-xs">{trip.source} → {trip.destination}</TableCell>
