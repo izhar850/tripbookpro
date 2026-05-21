@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
-import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
+import { signInWithEmailAndPassword, sendPasswordResetEmail, signOut } from "firebase/auth";
 import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Loader2, Truck, KeyRound } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
+import { getTransporterAccessIssue } from "@/lib/account-utils";
 import {
   Dialog,
   DialogContent,
@@ -42,11 +43,30 @@ export default function LoginPage() {
       
       if (userDoc.exists()) {
         const userData = userDoc.data();
-        if (userData.role === "admin") {
-          router.push("/admin");
-        } else {
-          router.push("/dashboard");
+        const accessIssue = getTransporterAccessIssue(userData);
+
+        if (accessIssue) {
+          if (userData.accountStatus === "pending") {
+            router.push("/dashboard");
+            return;
+          }
+          await signOut(auth);
+          toast({
+            title: "Access Denied",
+            description: accessIssue,
+            variant: "destructive",
+          });
+          return;
         }
+
+        router.push("/dashboard");
+      } else {
+        await signOut(auth);
+        toast({
+          title: "Access Denied",
+          description: "Profile not found.",
+          variant: "destructive",
+        });
       }
     } catch (error: any) {
       toast({

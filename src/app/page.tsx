@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Loader2, Truck, ShieldCheck, PieChart, FileText } from "lucide-react";
 import Link from "next/link";
+import { getTransporterAccessIssue } from "@/lib/account-utils";
 
 export default function LandingPage() {
   const router = useRouter();
@@ -19,11 +20,21 @@ export default function LandingPage() {
         const userDoc = await getDoc(doc(db, "users", user.uid));
         if (userDoc.exists()) {
           const userData = userDoc.data();
-          if (userData.role === "admin") {
-            router.push("/admin");
-          } else {
+          if (userData.role === "super_admin") {
+            router.push("/admin-dashboard");
+          } else if (!getTransporterAccessIssue(userData)) {
             router.push("/dashboard");
+          } else {
+            if (userData.accountStatus === "pending") {
+              router.push("/dashboard");
+            } else {
+              await signOut(auth);
+              setLoading(false);
+            }
           }
+        } else {
+          await signOut(auth);
+          setLoading(false);
         }
       } else {
         setLoading(false);

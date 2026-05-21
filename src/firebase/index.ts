@@ -3,11 +3,13 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getAuth, type Auth } from 'firebase/auth';
+import { getStorage, type FirebaseStorage } from 'firebase/storage';
 import { firebaseConfig } from './config';
 
-let app: FirebaseApp;
-let firestore: Firestore;
-let auth: Auth;
+export let app: FirebaseApp;
+export let db: Firestore;
+export let auth: Auth;
+export let storage: FirebaseStorage;
 
 /**
  * Initializes Firebase services if they haven't been initialized already.
@@ -19,10 +21,11 @@ export function initializeFirebase() {
     app = initializeApp(firebaseConfig);
   }
 
-  firestore = getFirestore(app);
+  db = getFirestore(app);
   auth = getAuth(app);
+  storage = getStorage(app);
 
-  return { app, firestore, auth };
+  return { app, firestore: db, auth, storage };
 }
 
 export * from './provider';

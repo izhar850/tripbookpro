@@ -7,13 +7,13 @@
     "dev": "next dev --turbopack -p 9002",
     "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
     "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
-    "build": "NODE_ENV=production next build",
+    "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest",
-    "test:ui": "vitest --ui",
-    "test:run": "vitest run"
+    "test": "vitest --configLoader runner",
+    "test:ui": "vitest --ui --configLoader runner",
+    "test:run": "vitest run --configLoader runner"
   },
   "dependencies": {
     "@genkit-ai/google-genai": "^1.28.0",

@@ -3,7 +3,8 @@
 
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { signOut } from "firebase/auth";
 import { 
   SidebarProvider, 
   Sidebar, 
@@ -21,6 +22,8 @@ import { Loader2, LayoutDashboard, Users, CreditCard, User, LogOut, Truck, Menu 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { getTransporterAccessIssue } from "@/lib/account-utils";
+import { useToast } from "@/hooks/use-toast";
 
 function MobileHeader() {
   const { toggleSidebar } = useSidebar();
@@ -46,6 +49,8 @@ function NavMenu() {
 
   const navItems = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { name: "Vehicles", href: "/vehicles", icon: Truck },
+    // Driver module is hidden from the active workflow; legacy driver data/code remains untouched.
     { name: "Parties", href: "/parties", icon: Users },
     { name: "Billing", href: "/billing", icon: CreditCard },
     { name: "Profile", href: "/profile", icon: User },
@@ -133,19 +138,68 @@ function TransporterSidebar() {
 }
 
 export default function TransporterLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, profile, loading, auth, logout } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
+  const [redirecting, setRedirecting] = useState(false);
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push("/login");
-    }
-  }, [user, loading, router]);
+    if (loading || redirecting) return;
 
-  if (loading || !user) {
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+
+    const accessIssue = getTransporterAccessIssue(profile);
+    if (accessIssue && auth) {
+      if (profile?.accountStatus === "pending") {
+        return;
+      }
+
+      setRedirecting(true);
+      toast({
+        title: "Access Denied",
+        description: accessIssue,
+        variant: "destructive",
+      });
+      signOut(auth).finally(() => router.push("/login"));
+    }
+  }, [auth, loading, profile, redirecting, router, toast, user]);
+
+  if (loading || !user || redirecting) {
     return (
       <div className="h-screen w-full flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (profile?.accountStatus === "pending") {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-background p-6">
+        <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:32px_32px] pointer-events-none" />
+        <div className="w-full max-w-md bg-card border border-border/50 shadow-2xl p-8 rounded-2xl text-center space-y-6 relative z-10">
+          <div className="mx-auto w-16 h-16 bg-orange-500/10 rounded-2xl flex items-center justify-center shadow-lg border border-orange-500/20">
+            <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-headline font-bold">Account Pending Approval</h2>
+            <p className="text-primary text-sm font-bold">
+              Your account is pending admin approval.
+            </p>
+            <p className="text-muted-foreground text-sm">
+              Thank you for registering <strong>{profile?.companyName}</strong>. 
+              Your account is currently under review by our admin team.
+            </p>
+            <p className="text-muted-foreground text-xs">
+              You will get access to the dashboard as soon as your account is approved.
+            </p>
+          </div>
+          <Button onClick={() => logout()} variant="outline" className="w-full h-11 font-bold">
+            <LogOut className="w-4 h-4 mr-2" /> Logout
+          </Button>
+        </div>
       </div>
     );
   }

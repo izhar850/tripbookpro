@@ -1,19 +1,33 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, addDoc, doc, deleteDoc, serverTimestamp, updateDoc } from "firebase/firestore";
+import { collection, addDoc, doc, deleteDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { Plus, Edit, Trash2, Users, Search, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
+import {
+  isValidMobile,
+  nextSortDirection,
+  normalizeGstNo,
+  normalizeMultiline,
+  normalizeText,
+  sortRows,
+  type SortConfig,
+} from "@/lib/transport-utils";
+import { getSubscriptionBlockMessage, isSubscriptionActive } from "@/lib/account-utils";
+import { subscribeToOwnedCollection } from "@/lib/firestore-query-utils";
+
+type PartySortKey = "createdAt" | "partyName" | "gstNo" | "mobile";
 
 export default function PartiesPage() {
   const { profile } = useAuth();
@@ -21,6 +35,7 @@ export default function PartiesPage() {
   const [parties, setParties] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [partySort, setPartySort] = useState<SortConfig<PartySortKey>>({ key: "createdAt", direction: "desc" });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingParty, setEditingParty] = useState<any>(null);
   const [formData, setFormData] = useState({
@@ -29,17 +44,31 @@ export default function PartiesPage() {
     mobile: "",
     address: ""
   });
+  const subscriptionActive = isSubscriptionActive(profile);
+  const subscriptionBlockMessage = getSubscriptionBlockMessage(profile);
+
+  const guardSubscriptionAction = () => {
+    if (subscriptionActive) return false;
+    toast({
+      title: "Subscription Required",
+      description: subscriptionBlockMessage || "Subscription expired. Please contact admin to renew.",
+      variant: "destructive",
+    });
+    return true;
+  };
 
   useEffect(() => {
     if (!profile) return;
-    const q = query(collection(db, "parties"), where("userId", "==", profile.uid));
-    const unsubscribe = onSnapshot(
-      q, 
-      (snapshot) => {
-        setParties(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    const unsubscribe = subscribeToOwnedCollection(
+      db,
+      "parties",
+      profile,
+      [],
+      (rows) => {
+        setParties(rows);
         setLoading(false);
       },
-      async (serverError) => {
+      () => {
         const permissionError = new FirestorePermissionError({
           path: 'parties',
           operation: 'list',
@@ -54,36 +83,56 @@ export default function PartiesPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
+    if (guardSubscriptionAction()) return;
+
+    const partyData = {
+      partyName: normalizeText(formData.partyName),
+      gstNo: normalizeGstNo(formData.gstNo),
+      mobile: normalizeText(formData.mobile),
+      address: normalizeMultiline(formData.address),
+    };
+
+    if (!partyData.partyName) {
+      toast({ title: "Validation Error", description: "Party name is required.", variant: "destructive" });
+      return;
+    }
+    if (!isValidMobile(partyData.mobile)) {
+      toast({ title: "Validation Error", description: "Mobile number must be exactly 10 digits.", variant: "destructive" });
+      return;
+    }
     
     try {
       if (editingParty) {
         const partyRef = doc(db, "parties", editingParty.id);
-        updateDoc(partyRef, {
-          ...formData,
+        await updateDoc(partyRef, {
+          ...partyData,
           updatedAt: serverTimestamp()
         }).catch(async (error) => {
           const permissionError = new FirestorePermissionError({
             path: partyRef.path,
             operation: 'update',
-            requestResourceData: formData,
+            requestResourceData: partyData,
           } satisfies SecurityRuleContext);
           errorEmitter.emit('permission-error', permissionError);
+          throw error;
         });
         toast({ title: "Updated", description: "Party details updated." });
       } else {
         const partiesCollection = collection(db, "parties");
         const data = {
-          ...formData,
+          ...partyData,
+          companyId: profile.companyId,
           userId: profile.uid,
           createdAt: serverTimestamp()
         };
-        addDoc(partiesCollection, data).catch(async (error) => {
+        await addDoc(partiesCollection, data).catch(async (error) => {
           const permissionError = new FirestorePermissionError({
             path: 'parties',
             operation: 'create',
             requestResourceData: data,
           } satisfies SecurityRuleContext);
           errorEmitter.emit('permission-error', permissionError);
+          throw error;
         });
         toast({ title: "Success", description: "New party added." });
       }
@@ -96,6 +145,7 @@ export default function PartiesPage() {
   };
 
   const handleDelete = async (id: string) => {
+    if (guardSubscriptionAction()) return;
     if (confirm("Delete this party?")) {
       const partyRef = doc(db, "parties", id);
       deleteDoc(partyRef).catch(async (error) => {
@@ -109,10 +159,28 @@ export default function PartiesPage() {
     }
   };
 
-  const filteredParties = parties.filter(p => 
-    p.partyName.toLowerCase().includes(search.toLowerCase()) || 
-    p.gstNo.toLowerCase().includes(search.toLowerCase())
-  );
+  const handlePartySort = (key: PartySortKey) => {
+    setPartySort((current) => ({
+      key,
+      direction: nextSortDirection(current, key),
+    }));
+  };
+
+  const filteredParties = parties.filter(p => {
+    const queryText = search.toLowerCase();
+    return (
+      (p.partyName || "").toLowerCase().includes(queryText) || 
+      (p.gstNo || "").toLowerCase().includes(queryText) ||
+      (p.mobile || "").toLowerCase().includes(queryText)
+    );
+  });
+
+  const sortedParties = useMemo(() => sortRows(filteredParties, partySort, {
+    createdAt: (party) => party.createdAt || party.updatedAt,
+    partyName: (party) => party.partyName,
+    gstNo: (party) => party.gstNo,
+    mobile: (party) => party.mobile,
+  }), [filteredParties, partySort]);
 
   return (
     <div className="space-y-6">
@@ -123,7 +191,12 @@ export default function PartiesPage() {
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={() => { setEditingParty(null); setFormData({ partyName: "", gstNo: "", mobile: "", address: "" }); }} className="bg-gradient-primary h-11 px-6 font-bold">
+            <Button
+              onClick={() => { setEditingParty(null); setFormData({ partyName: "", gstNo: "", mobile: "", address: "" }); }}
+              disabled={!subscriptionActive}
+              title={!subscriptionActive ? subscriptionBlockMessage : "Add New Party"}
+              className="bg-gradient-primary h-11 px-6 font-bold"
+            >
               <Plus className="w-5 h-5 mr-2" /> Add New Party
             </Button>
           </DialogTrigger>
@@ -138,7 +211,7 @@ export default function PartiesPage() {
               </div>
               <div className="space-y-2">
                 <Label>GST Number</Label>
-                <Input value={formData.gstNo} onChange={e => setFormData({ ...formData, gstNo: e.target.value })} placeholder="e.g. 07AAAAA0000A1Z5" />
+                <Input value={formData.gstNo} onChange={e => setFormData({ ...formData, gstNo: e.target.value.toUpperCase() })} placeholder="e.g. 07AAAAA0000A1Z5" />
               </div>
               <div className="space-y-2">
                 <Label>Mobile Number</Label>
@@ -188,15 +261,15 @@ export default function PartiesPage() {
             <Table>
               <TableHeader className="bg-secondary/50">
                 <TableRow>
-                  <TableHead className="font-bold">Party Name</TableHead>
-                  <TableHead className="font-bold">GST No</TableHead>
-                  <TableHead className="font-bold">Mobile</TableHead>
+                  <SortableTableHead active={partySort.key === "partyName"} direction={partySort.direction} onSort={() => handlePartySort("partyName")}>Party Name</SortableTableHead>
+                  <SortableTableHead active={partySort.key === "gstNo"} direction={partySort.direction} onSort={() => handlePartySort("gstNo")}>GST No</SortableTableHead>
+                  <SortableTableHead active={partySort.key === "mobile"} direction={partySort.direction} onSort={() => handlePartySort("mobile")}>Mobile</SortableTableHead>
                   <TableHead className="font-bold">Address</TableHead>
                   <TableHead className="font-bold text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredParties.map((party) => (
+                {sortedParties.map((party) => (
                   <TableRow key={party.id} className="hover:bg-secondary/30 transition-colors">
                     <TableCell className="font-bold text-primary">{party.partyName}</TableCell>
                     <TableCell className="text-sm font-mono">{party.gstNo || "N/A"}</TableCell>
@@ -204,10 +277,10 @@ export default function PartiesPage() {
                     <TableCell className="text-xs max-w-[200px] truncate">{party.address || "N/A"}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Button size="icon" variant="ghost" className="text-blue-500" onClick={() => { setEditingParty(party); setFormData({ partyName: party.partyName, gstNo: party.gstNo, mobile: party.mobile, address: party.address }); setIsDialogOpen(true); }}>
+                        <Button size="icon" variant="ghost" className="text-blue-500" disabled={!subscriptionActive} title={!subscriptionActive ? subscriptionBlockMessage : "Edit"} onClick={() => { setEditingParty(party); setFormData({ partyName: party.partyName || "", gstNo: party.gstNo || "", mobile: party.mobile || "", address: party.address || "" }); setIsDialogOpen(true); }}>
                           <Edit className="w-4 h-4" />
                         </Button>
-                        <Button size="icon" variant="ghost" className="text-destructive" onClick={() => handleDelete(party.id)}>
+                        <Button size="icon" variant="ghost" className="text-destructive" disabled={!subscriptionActive} title={!subscriptionActive ? subscriptionBlockMessage : "Delete"} onClick={() => handleDelete(party.id)}>
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>

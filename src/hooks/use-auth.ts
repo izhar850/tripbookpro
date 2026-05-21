@@ -10,10 +10,17 @@ import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/e
 
 export interface UserProfile {
   uid: string;
+  companyId: string;
   companyName: string;
   ownerName: string;
   email: string;
-  role: 'transporter' | 'admin';
+  role: 'transporter' | 'admin' | 'super_admin';
+  accountStatus?: 'pending' | 'active' | 'suspended';
+  plan?: 'trial' | 'monthly' | 'three_months' | 'six_months' | 'yearly';
+  planName?: string;
+  planStartDate?: any;
+  planExpiryDate?: any;
+  paymentStatus?: 'pending' | 'paid' | 'unpaid' | 'overdue';
   mobile: string;
   officePhone: string;
   gstNo: string;
@@ -42,7 +49,8 @@ export function useAuth() {
         profileRef, 
         (snapshot) => {
           if (snapshot.exists()) {
-            setProfile({ ...snapshot.data(), uid: snapshot.id } as UserProfile);
+            const data = snapshot.data();
+            setProfile({ ...data, uid: snapshot.id, companyId: data?.companyId || snapshot.id } as UserProfile);
           } else {
             setProfile(null);
           }
@@ -65,10 +73,10 @@ export function useAuth() {
     }
   }, [user, userLoading, db]);
 
-  const logout = async () => {
+  const logout = async (redirectTo = '/login') => {
     if (auth) {
       await signOut(auth);
-      router.push('/login');
+      router.push(redirectTo);
     }
   };
 

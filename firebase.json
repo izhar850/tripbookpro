@@ -9,5 +9,11 @@
     "frameworksBackend": {
       "region": "us-central1"
     }
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "storage": {
+    "rules": "storage.rules"
   }
 }

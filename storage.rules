@@ -1,0 +1,47 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function hasUserProfile() {
+      return request.auth != null &&
+             firestore.exists(/databases/(default)/documents/users/$(request.auth.uid));
+    }
+
+    function currentUser() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isSuperAdmin() {
+      return hasUserProfile() && currentUser().role == 'super_admin';
+    }
+
+    function hasActiveStatus(userData) {
+      return !('accountStatus' in userData) || userData.accountStatus == 'active';
+    }
+
+    function hasValidPlan(userData) {
+      return !('planExpiryDate' in userData) ||
+             userData.planExpiryDate == null ||
+             userData.planExpiryDate >= request.time;
+    }
+
+    function canWriteCompanyFiles(companyId) {
+      return isSuperAdmin() ||
+             (hasUserProfile() &&
+              currentUser().role == 'transporter' &&
+              hasActiveStatus(currentUser()) &&
+              hasValidPlan(currentUser()) &&
+              (request.auth.uid == companyId || currentUser().companyId == companyId));
+    }
+
+    function canReadCompanyFiles(companyId) {
+      return isSuperAdmin() ||
+             (hasUserProfile() &&
+              (request.auth.uid == companyId || currentUser().companyId == companyId));
+    }
+
+    match /trip-files/{companyId}/{tripId}/{fileName} {
+      allow read: if canReadCompanyFiles(companyId);
+      allow write: if canWriteCompanyFiles(companyId);
+    }
+  }
+}

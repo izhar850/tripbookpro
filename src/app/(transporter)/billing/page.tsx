@@ -4,19 +4,29 @@
 import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { db } from "@/lib/firebase";
-import { collection, query, where, onSnapshot, doc, runTransaction, serverTimestamp } from "firebase/firestore";
+import { collection, where, doc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AlertCircle, CreditCard, Loader2, FileCheck, Users, Download, ReceiptText } from "lucide-react";
+import { AlertCircle, CreditCard, Loader2, FileCheck, Users, Download, ReceiptText, Edit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import { cn } from "@/lib/utils";
+import Link from "next/link";
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
+import {
+  nextSortDirection,
+  normalizeVehicleNo,
+  sortRows,
+  type SortConfig,
+} from "@/lib/transport-utils";
+import { subscribeToOwnedCollection } from "@/lib/firestore-query-utils";
+
+type BillingSortKey = "date" | "billNo" | "lrNo" | "partyName" | "vehicleNo" | "status" | "totalAmount";
 
 export default function BillingPage() {
   const { profile } = useAuth();
@@ -31,16 +41,19 @@ export default function BillingPage() {
   const [generating, setGenerating] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [viewStatus, setViewStatus] = useState<"unbilled" | "billed">("unbilled");
+  const [billingSort, setBillingSort] = useState<SortConfig<BillingSortKey>>({ key: "date", direction: "desc" });
 
   useEffect(() => {
     if (!profile) return;
-    const partiesQuery = query(collection(db, "parties"), where("userId", "==", profile.uid));
-    const unsubscribeParties = onSnapshot(
-      partiesQuery, 
-      (snapshot) => {
-        setParties(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    const unsubscribeParties = subscribeToOwnedCollection(
+      db,
+      "parties",
+      profile,
+      [],
+      (rows) => {
+        setParties(rows);
       },
-      async (serverError) => {
+      () => {
         const permissionError = new FirestorePermissionError({
           path: 'parties',
           operation: 'list',
@@ -54,19 +67,16 @@ export default function BillingPage() {
   useEffect(() => {
     if (!profile) return;
     setLoading(true);
-    const tripsQuery = query(
-      collection(db, "trips"), 
-      where("userId", "==", profile.uid), 
-      where("billed", "==", viewStatus === "billed")
-    );
-    
-    const unsubscribe = onSnapshot(
-      tripsQuery, 
-      (snapshot) => {
-        setTrips(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    const unsubscribe = subscribeToOwnedCollection(
+      db,
+      "trips",
+      profile,
+      [where("billed", "==", viewStatus === "billed")],
+      (rows) => {
+        setTrips(rows);
         setLoading(false);
       },
-      async (serverError) => {
+      () => {
         const permissionError = new FirestorePermissionError({
           path: 'trips',
           operation: 'list',
@@ -88,6 +98,23 @@ export default function BillingPage() {
     return trips.filter(t => t.partyId === selectedPartyId);
   }, [trips, selectedPartyId]);
 
+  const sortedCurrentTrips = useMemo(() => sortRows(currentTrips, billingSort, {
+    date: (trip) => trip.createdAt || trip.date,
+    billNo: (trip) => trip.billNo,
+    lrNo: (trip) => trip.lrNo,
+    partyName: (trip) => trip.partyName,
+    vehicleNo: (trip) => normalizeVehicleNo(trip.vehicleNo),
+    status: (trip) => trip.status || trip.paymentStatus,
+    totalAmount: (trip) => Number(trip.totalAmount || trip.totalFreight || 0),
+  }), [currentTrips, billingSort]);
+
+  const handleBillingSort = (key: BillingSortKey) => {
+    setBillingSort((current) => ({
+      key,
+      direction: nextSortDirection(current, key),
+    }));
+  };
+
   const toggleTripSelection = (id: string) => {
     setSelectedTripIds(prev => 
       prev.includes(id) ? prev.filter(tid => tid !== id) : [...prev, id]
@@ -102,7 +129,7 @@ export default function BillingPage() {
 
   const handleExportCSV = () => {
     // If some are selected, export those. Otherwise export all visible in current list.
-    const dataToExport = selectedTripIds.length > 0 ? selectedTripsData : currentTrips;
+    const dataToExport = selectedTripIds.length > 0 ? selectedTripsData : sortedCurrentTrips;
 
     if (dataToExport.length === 0) {
       toast({
@@ -126,7 +153,7 @@ export default function BillingPage() {
         t.lrNo || "",
         t.date || "",
         t.partyName || "",
-        t.vehicleNo || "",
+        normalizeVehicleNo(t.vehicleNo),
         t.source || "",
         t.destination || "",
         t.packages || 0,
@@ -203,7 +230,13 @@ export default function BillingPage() {
           partyAddress: party.address || "",
           partyMobile: party.mobile || "",
           invoiceTotal,
-          trips: selectedTripsData,
+          trips: selectedTripsData.map((trip) => ({
+            ...trip,
+            vehicleNo: normalizeVehicleNo(trip.vehicleNo),
+          })),
+          companyId: profile.companyId,
+          billDate: new Date().toISOString().split("T")[0],
+          notes: "",
           transporterProfile: {
             companyName: profile.companyName,
             address: profile.address,
@@ -225,11 +258,13 @@ export default function BillingPage() {
           transaction.update(tripRef, { 
             billed: true, 
             billNo, 
-            invoiceId 
+            invoiceId,
+            status: "Billed",
+            statusUpdatedAt: serverTimestamp()
           });
         });
 
-        transaction.update(counterRef, { lastBillNo: nextBillNo });
+        transaction.set(counterRef, { lastBillNo: nextBillNo }, { merge: true });
       }).catch(async (error) => {
         const permissionError = new FirestorePermissionError({
           path: 'invoices',
@@ -310,6 +345,7 @@ export default function BillingPage() {
                   <Button 
                     onClick={handleGenerateInvoice}
                     disabled={selectedTripIds.length === 0 || generating}
+                    title="Generate Tax Invoice"
                     className="w-full bg-gradient-primary h-12 shadow-indigo-500/20 shadow-lg font-bold text-lg"
                   >
                     {generating ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <FileCheck className="w-5 h-5 mr-2" />}
@@ -355,7 +391,7 @@ export default function BillingPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              {currentTrips.length === 0 ? (
+              {sortedCurrentTrips.length === 0 ? (
                 <div className="h-96 flex flex-col items-center justify-center text-muted-foreground p-8 text-center">
                   <AlertCircle className="w-16 h-16 mb-4 opacity-20 text-orange-500" />
                   <p className="font-bold text-lg">No records found.</p>
@@ -368,25 +404,31 @@ export default function BillingPage() {
                       <TableRow>
                         <TableHead className="w-[60px]">
                           <Checkbox 
-                            checked={selectedTripIds.length === currentTrips.length && currentTrips.length > 0}
+                            checked={selectedTripIds.length === sortedCurrentTrips.length && sortedCurrentTrips.length > 0}
                             onCheckedChange={(checked) => {
                               if (checked) {
-                                setSelectedTripIds(currentTrips.map(t => t.id));
+                                setSelectedTripIds(sortedCurrentTrips.map(t => t.id));
                               } else {
                                 setSelectedTripIds([]);
                               }
                             }}
                           />
                         </TableHead>
-                        {viewStatus === "billed" && <TableHead className="font-bold">Bill No</TableHead>}
-                        <TableHead className="font-bold">LR No</TableHead>
-                        <TableHead className="font-bold">Party</TableHead>
+                        {viewStatus === "billed" && (
+                          <SortableTableHead active={billingSort.key === "billNo"} direction={billingSort.direction} onSort={() => handleBillingSort("billNo")}>Bill No</SortableTableHead>
+                        )}
+                        <SortableTableHead active={billingSort.key === "date"} direction={billingSort.direction} onSort={() => handleBillingSort("date")}>Date</SortableTableHead>
+                        <SortableTableHead active={billingSort.key === "lrNo"} direction={billingSort.direction} onSort={() => handleBillingSort("lrNo")}>LR No</SortableTableHead>
+                        <SortableTableHead active={billingSort.key === "partyName"} direction={billingSort.direction} onSort={() => handleBillingSort("partyName")}>Party</SortableTableHead>
+                        <SortableTableHead active={billingSort.key === "vehicleNo"} direction={billingSort.direction} onSort={() => handleBillingSort("vehicleNo")}>Vehicle</SortableTableHead>
+                        <SortableTableHead active={billingSort.key === "status"} direction={billingSort.direction} onSort={() => handleBillingSort("status")}>Status</SortableTableHead>
                         <TableHead className="font-bold">Route</TableHead>
-                        <TableHead className="font-bold text-right">Amount</TableHead>
+                        <SortableTableHead active={billingSort.key === "totalAmount"} direction={billingSort.direction} onSort={() => handleBillingSort("totalAmount")} align="right">Amount</SortableTableHead>
+                        {viewStatus === "billed" && <TableHead className="font-bold text-right">Bill</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {currentTrips.map((trip) => (
+                      {sortedCurrentTrips.map((trip) => (
                         <TableRow 
                           key={trip.id} 
                           className="hover:bg-secondary/20 transition-colors cursor-pointer" 
@@ -400,10 +442,24 @@ export default function BillingPage() {
                             />
                           </TableCell>
                           {viewStatus === "billed" && <TableCell className="font-mono text-xs">{trip.billNo}</TableCell>}
+                          <TableCell className="text-xs whitespace-nowrap">{trip.date}</TableCell>
                           <TableCell className="font-bold text-primary">{trip.lrNo}</TableCell>
                           <TableCell className="text-sm truncate max-w-[120px]">{trip.partyName}</TableCell>
+                          <TableCell className="text-xs font-mono">{normalizeVehicleNo(trip.vehicleNo)}</TableCell>
+                          <TableCell className="text-xs">{trip.status || trip.paymentStatus || "Pending"}</TableCell>
                           <TableCell className="text-xs">{trip.source} → {trip.destination}</TableCell>
-                          <TableCell className="text-right font-bold text-foreground">₹{trip.totalAmount.toLocaleString()}</TableCell>
+                          <TableCell className="text-right font-bold text-foreground">₹{Number(trip.totalAmount || 0).toLocaleString()}</TableCell>
+                          {viewStatus === "billed" && (
+                            <TableCell className="text-right" onClick={(event) => event.stopPropagation()}>
+                              {trip.invoiceId && (
+                                <Link href={`/invoice-preview?id=${trip.invoiceId}`}>
+                                  <Button size="sm" variant="outline" className="h-8 font-bold">
+                                    <Edit className="w-3 h-3 mr-1" /> Edit Bill
+                                  </Button>
+                                </Link>
+                              )}
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))}
                     </TableBody>

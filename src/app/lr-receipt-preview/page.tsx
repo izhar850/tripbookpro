@@ -8,6 +8,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Printer, ArrowLeft, Truck, Loader2 } from "lucide-react";
 import { numberToWords } from "@/lib/format-utils";
+import { normalizeVehicleNo } from "@/lib/transport-utils";
 
 function LRReceiptContent() {
   const searchParams = useSearchParams();
@@ -131,7 +132,7 @@ function LRReceiptContent() {
                   {trip.sizeL || '-'}x{trip.sizeW || '-'}x{trip.sizeH || '-'} ft
                 </td>
                 <td className="border-r-2 border-black p-4 text-center font-bold">{Number(trip.weight || 0)}</td>
-                <td className="border-r-2 border-black p-4 text-center font-bold">{trip.vehicleNo}</td>
+                <td className="border-r-2 border-black p-4 text-center font-bold">{normalizeVehicleNo(trip.vehicleNo)}</td>
                 <td className="p-4 text-right font-bold">₹{Number(trip.rateQtl || 0).toFixed(2)}</td>
               </tr>
             </tbody>
