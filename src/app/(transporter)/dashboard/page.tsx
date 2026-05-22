@@ -1575,8 +1575,8 @@ export default function Dashboard() {
                 <Table>
                   <TableHeader className="bg-secondary/30">
                     <TableRow>
-                    <SortableTableHead active={tripSort.key === "date"} direction={tripSort.direction} onSort={() => handleTripSort("date")}>Date</SortableTableHead>
                     <SortableTableHead active={tripSort.key === "lrNo"} direction={tripSort.direction} onSort={() => handleTripSort("lrNo")}>LR No</SortableTableHead>
+                    <TableHead className="font-bold">POD</TableHead>
                     <SortableTableHead active={tripSort.key === "consignorName"} direction={tripSort.direction} onSort={() => handleTripSort("consignorName")}>Consignor</SortableTableHead>
                     <SortableTableHead active={tripSort.key === "consigneeName"} direction={tripSort.direction} onSort={() => handleTripSort("consigneeName")}>Consignee</SortableTableHead>
                     <SortableTableHead active={tripSort.key === "status"} direction={tripSort.direction} onSort={() => handleTripSort("status")}>Trip Status</SortableTableHead>
@@ -1591,20 +1591,19 @@ export default function Dashboard() {
                   {sortedTrips.map((trip) => {
                     return (
                       <TableRow key={trip.id} className="hover:bg-secondary/20 group">
-                        <TableCell className="text-xs whitespace-nowrap">{trip.date}</TableCell>
                         <TableCell className="font-bold text-primary">
-                          <div className="flex flex-col gap-1">
-                            <span>{trip.lrNo}</span>
-                            {trip.hasPOD ? (
-                              <Badge variant="outline" className="text-[8px] px-1 py-0 h-4 w-fit bg-green-500/10 text-green-500 border-green-500/20">
-                                POD Uploaded
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-[8px] px-1 py-0 h-4 w-fit bg-slate-500/10 text-slate-500 border-slate-500/20">
-                                No POD
-                              </Badge>
-                            )}
-                          </div>
+                          {trip.lrNo}
+                        </TableCell>
+                        <TableCell>
+                          {trip.hasPOD ? (
+                            <Badge variant="outline" className="h-5 whitespace-nowrap bg-green-500/10 px-2 py-0 text-[10px] text-green-500 border-green-500/20">
+                              POD Uploaded
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="h-5 whitespace-nowrap bg-slate-500/10 px-2 py-0 text-[10px] text-slate-500 border-slate-500/20">
+                              No POD
+                            </Badge>
+                          )}
                         </TableCell>
                         <TableCell className="font-medium truncate max-w-[140px]">{getTripConsignorName(trip)}</TableCell>
                         <TableCell className="font-medium truncate max-w-[140px]">{getTripConsigneeName(trip)}</TableCell>
