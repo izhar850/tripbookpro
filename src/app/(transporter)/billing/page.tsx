@@ -12,6 +12,8 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { MobileDataCard, MobileDataCards, MobileDataField } from "@/components/ui/mobile-data-card";
 import { AlertCircle, CreditCard, Loader2, FileCheck, Users, Download, ReceiptText, Edit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
@@ -32,6 +34,13 @@ type BillingSortKey = "date" | "billNo" | "lrNo" | "partyName" | "vehicleNo" | "
 const getPartyType = (party: any) => party?.partyType === "consignor" ? "consignor" : "consignee";
 const getTripBillingPartyId = (trip: any) => trip?.consigneePartyId || trip?.partyId || "";
 const getTripBillingPartyName = (trip: any) => trip?.consigneeName || trip?.partyName || "";
+const getBillingStatusBadgeClass = (status: string) => {
+  if (status === "Paid") return "bg-green-500/10 text-green-500 border-green-500/20";
+  if (status === "Billed") return "bg-orange-500/10 text-orange-500 border-orange-500/20";
+  if (status === "In Transit") return "bg-blue-500/10 text-blue-500 border-blue-500/20";
+  if (status === "Delivered") return "bg-indigo-500/10 text-indigo-500 border-indigo-500/20";
+  return "bg-slate-500/10 text-slate-500 border-slate-500/20";
+};
 
 export default function BillingPage() {
   const { profile } = useAuth();
@@ -417,7 +426,78 @@ export default function BillingPage() {
                   <p className="text-sm max-w-xs mx-auto">There are no trips matching your criteria in this section.</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <>
+                  <div className="p-4 md:hidden">
+                    <div className="mb-4 flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setSelectedTripIds(sortedCurrentTrips.map((trip) => trip.id))}
+                      >
+                        Select Visible
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setSelectedTripIds([])}
+                        disabled={selectedTripIds.length === 0}
+                      >
+                        Clear Selection
+                      </Button>
+                    </div>
+
+                    <MobileDataCards className="space-y-4">
+                      {sortedCurrentTrips.map((trip) => {
+                        const tripStatus = trip.status || trip.paymentStatus || "Pending";
+
+                        return (
+                          <MobileDataCard
+                            key={trip.id}
+                            title={trip.lrNo || "Trip"}
+                            titleClassName="text-primary"
+                            subtitle={trip.date || "Date not set"}
+                            badge={(
+                              <Badge variant="outline" className={getBillingStatusBadgeClass(tripStatus)}>
+                                {tripStatus}
+                              </Badge>
+                            )}
+                            headerRight={(
+                              <Checkbox
+                                checked={selectedTripIds.includes(trip.id)}
+                                onCheckedChange={() => toggleTripSelection(trip.id)}
+                                aria-label={`Select ${trip.lrNo || "trip"}`}
+                              />
+                            )}
+                            actions={(
+                              <>
+                                <Button variant="outline" size="sm" className="flex-1 sm:flex-none" onClick={() => toggleTripSelection(trip.id)}>
+                                  {selectedTripIds.includes(trip.id) ? "Unselect" : "Select"}
+                                </Button>
+                                {viewStatus === "billed" && trip.invoiceId ? (
+                                  <Link href={`/invoice-preview?id=${trip.invoiceId}`} className="flex-1 sm:flex-none">
+                                    <Button variant="outline" size="sm" className="w-full">
+                                      <Edit className="mr-2 h-4 w-4" /> Edit Bill
+                                    </Button>
+                                  </Link>
+                                ) : null}
+                              </>
+                            )}
+                          >
+                            {viewStatus === "billed" ? (
+                              <MobileDataField label="Bill No" value={<span className="font-mono text-xs">{trip.billNo || "N/A"}</span>} />
+                            ) : null}
+                            <MobileDataField label="Date" value={trip.date} />
+                            <MobileDataField label="Consignee" value={getTripBillingPartyName(trip)} />
+                            <MobileDataField label="Vehicle" value={<span className="font-mono text-xs">{normalizeVehicleNo(trip.vehicleNo) || "N/A"}</span>} />
+                            <MobileDataField label="Route" value={`${trip.source || "N/A"} -> ${trip.destination || "N/A"}`} className="sm:col-span-2" />
+                            <MobileDataField label="Amount" value={`₹${Number(trip.totalAmount || 0).toLocaleString()}`} />
+                          </MobileDataCard>
+                        );
+                      })}
+                    </MobileDataCards>
+                  </div>
+
+                  <div className="hidden md:block overflow-x-auto">
                   <Table>
                     <TableHeader className="bg-secondary/30">
                       <TableRow>
@@ -483,7 +563,8 @@ export default function BillingPage() {
                       ))}
                     </TableBody>
                   </Table>
-                </div>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>

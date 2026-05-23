@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { TripFilesModal } from "@/components/trip-files-modal";
+import { MobileDataCard, MobileDataCards, MobileDataField } from "@/components/ui/mobile-data-card";
 import { 
   AlertDialog, 
   AlertDialogAction, 
@@ -973,6 +974,122 @@ export default function Dashboard() {
 
   const COLORS = ['#5850EC', '#2563EB', '#10B981', '#F59E0B', '#EF4444'];
 
+  const getTripPaymentBadgeClass = (paymentStatus: string) => {
+    if (paymentStatus === "Paid") return "bg-green-500/10 text-green-500 border-green-500/20";
+    if (paymentStatus === "Partial") return "bg-orange-500/10 text-orange-500 border-orange-500/20";
+    return "bg-destructive/10 text-destructive border-destructive/20";
+  };
+
+  const openTripFiles = (trip: any) => {
+    setSelectedTripForFiles(trip);
+    setIsFilesModalOpen(true);
+  };
+
+  const openTripPayment = (trip: any) => {
+    if (guardEditAction()) return;
+    setSelectedTripForPayment(trip);
+    setIsPaymentModalOpen(true);
+  };
+
+  const renderTripStatusSelect = (trip: any, className?: string) => (
+    <Select
+      value={trip.status || "Pending"}
+      onValueChange={(val) => handleUpdateStatus(trip.id, val)}
+      disabled={!subscriptionActive}
+    >
+      <SelectTrigger className={cn("h-8 text-xs font-bold", statusColors[trip.status || "Pending"], className)}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="Pending">Pending</SelectItem>
+        <SelectItem value="In Transit">In Transit</SelectItem>
+        <SelectItem value="Delivered">Delivered</SelectItem>
+        <SelectItem value="Billed">Billed</SelectItem>
+        <SelectItem value="Paid">Paid</SelectItem>
+      </SelectContent>
+    </Select>
+  );
+
+  const renderTripDesktopActions = (trip: any) => (
+    <div className="flex items-center justify-end gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+      <Button
+        size="icon"
+        variant="ghost"
+        className="h-8 w-8 text-primary"
+        title="Files / POD"
+        onClick={() => openTripFiles(trip)}
+      >
+        <Paperclip className="w-4 h-4" />
+      </Button>
+
+      <Button
+        size="icon"
+        variant="ghost"
+        className="h-8 w-8 text-indigo-500"
+        title="Record Payment"
+        disabled={!subscriptionActive}
+        onClick={() => openTripPayment(trip)}
+      >
+        <Wallet className="w-4 h-4" />
+      </Button>
+
+      <Link href={`/lr-receipt-preview?id=${trip.id}`}>
+        <Button size="icon" variant="ghost" className="h-8 w-8 text-green-500" title="View LR">
+          <FileText className="w-4 h-4" />
+        </Button>
+      </Link>
+
+      {trip.billed && trip.invoiceId ? (
+        <Link href={`/invoice-preview?id=${trip.invoiceId}`}>
+          <Button size="icon" variant="ghost" className="h-8 w-8 text-accent" title="View Bill">
+            <Receipt className="w-4 h-4" />
+          </Button>
+        </Link>
+      ) : null}
+
+      <Button size="icon" variant="ghost" onClick={() => handleEditTrip(trip)} disabled={!subscriptionActive} className="h-8 w-8 text-blue-500" title={!subscriptionActive ? subscriptionBlockMessage : "Edit"}>
+        <Edit className="w-4 h-4" />
+      </Button>
+
+      {!trip.billed ? (
+        <Button size="icon" variant="ghost" onClick={() => setTripToDelete(trip)} disabled={!subscriptionActive} className="h-8 w-8 text-destructive" title={!subscriptionActive ? subscriptionBlockMessage : "Delete"}>
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      ) : null}
+    </div>
+  );
+
+  const renderTripMobileActions = (trip: any) => (
+    <>
+      <Button variant="outline" size="sm" className="flex-1 sm:flex-none" onClick={() => openTripFiles(trip)}>
+        <Paperclip className="mr-2 h-4 w-4 text-primary" /> Files
+      </Button>
+      <Button variant="outline" size="sm" className="flex-1 sm:flex-none" disabled={!subscriptionActive} title={!subscriptionActive ? subscriptionBlockMessage : "Record Payment"} onClick={() => openTripPayment(trip)}>
+        <Wallet className="mr-2 h-4 w-4 text-indigo-500" /> Payment
+      </Button>
+      <Link href={`/lr-receipt-preview?id=${trip.id}`} className="flex-1 sm:flex-none">
+        <Button variant="outline" size="sm" className="w-full">
+          <FileText className="mr-2 h-4 w-4 text-green-500" /> LR Receipt
+        </Button>
+      </Link>
+      {trip.billed && trip.invoiceId ? (
+        <Link href={`/invoice-preview?id=${trip.invoiceId}`} className="flex-1 sm:flex-none">
+          <Button variant="outline" size="sm" className="w-full">
+            <Receipt className="mr-2 h-4 w-4 text-accent" /> View Bill
+          </Button>
+        </Link>
+      ) : null}
+      <Button variant="outline" size="sm" className="flex-1 sm:flex-none" disabled={!subscriptionActive} title={!subscriptionActive ? subscriptionBlockMessage : "Edit"} onClick={() => handleEditTrip(trip)}>
+        <Edit className="mr-2 h-4 w-4 text-blue-500" /> Edit
+      </Button>
+      {!trip.billed ? (
+        <Button variant="outline" size="sm" className="flex-1 sm:flex-none" disabled={!subscriptionActive} title={!subscriptionActive ? subscriptionBlockMessage : "Delete"} onClick={() => setTripToDelete(trip)}>
+          <Trash2 className="mr-2 h-4 w-4 text-destructive" /> Delete
+        </Button>
+      ) : null}
+    </>
+  );
+
   return (
     <div className="space-y-6 md:space-y-8 pb-20">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -1637,7 +1754,63 @@ export default function Dashboard() {
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+              <div className="p-4 md:hidden">
+                <MobileDataCards className="space-y-4">
+                  {sortedTrips.map((trip) => {
+                    const totalAmount = Number(trip.totalAmount || 0);
+                    const paidAmount = Number(trip.paidAmount || 0);
+                    const balanceAmount = Math.max(0, totalAmount - paidAmount);
+
+                    return (
+                      <MobileDataCard
+                        key={trip.id}
+                        title={trip.lrNo || "Trip"}
+                        titleClassName="text-primary"
+                        subtitle={trip.date || "Date not set"}
+                        badge={trip.hasPOD ? (
+                          <Badge variant="outline" className="h-6 whitespace-nowrap bg-green-500/10 px-2 py-0 text-[10px] text-green-500 border-green-500/20">
+                            POD Uploaded
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="h-6 whitespace-nowrap bg-slate-500/10 px-2 py-0 text-[10px] text-slate-500 border-slate-500/20">
+                            No POD
+                          </Badge>
+                        )}
+                        headerRight={(
+                          <Badge variant="outline" className={cn("text-[10px]", getTripPaymentBadgeClass(trip.paymentStatus || "Unpaid"))}>
+                            {trip.paymentStatus || "Unpaid"}
+                          </Badge>
+                        )}
+                        actions={renderTripMobileActions(trip)}
+                      >
+                        <MobileDataField
+                          label="Parties"
+                          value={(
+                            <div className="space-y-1">
+                              <div>
+                                <span className="text-xs text-muted-foreground">Consignor:</span>{" "}
+                                <span>{getTripConsignorName(trip) || "N/A"}</span>
+                              </div>
+                              <div>
+                                <span className="text-xs text-muted-foreground">Consignee:</span>{" "}
+                                <span>{getTripConsigneeName(trip) || "N/A"}</span>
+                              </div>
+                            </div>
+                          )}
+                          className="sm:col-span-2"
+                        />
+                        <MobileDataField label="Vehicle No" value={<span className="font-mono text-xs">{normalizeVehicleNo(trip.vehicleNo) || "N/A"}</span>} />
+                        <MobileDataField label="Route" value={`${trip.source || "N/A"} -> ${trip.destination || "N/A"}`} />
+                        <MobileDataField label="Trip Status" value={renderTripStatusSelect(trip, "px-3")} />
+                        <MobileDataField label="Freight" value={`₹${totalAmount.toLocaleString()}`} />
+                        <MobileDataField label="Balance" value={`₹${balanceAmount.toLocaleString()}`} />
+                      </MobileDataCard>
+                    );
+                  })}
+                </MobileDataCards>
+              </div>
+              <div className="hidden md:block overflow-x-auto">
                 <Table>
                   <TableHeader className="bg-secondary/30">
                     <TableRow>
@@ -1710,66 +1883,14 @@ export default function Dashboard() {
                         <TableCell className="text-xs font-mono">{normalizeVehicleNo(trip.vehicleNo)}</TableCell>
                         <TableCell className="text-xs">{trip.source} → {trip.destination}</TableCell>
                         <TableCell className="text-right font-bold">₹{Number(trip.totalAmount || 0).toLocaleString()}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button 
-                              size="icon" 
-                              variant="ghost" 
-                              className="h-8 w-8 text-primary" 
-                              title="Files / POD"
-                              onClick={() => {
-                                setSelectedTripForFiles(trip);
-                                setIsFilesModalOpen(true);
-                              }}
-                            >
-                              <Paperclip className="w-4 h-4" />
-                            </Button>
-
-                            <Button 
-                              size="icon" 
-                              variant="ghost" 
-                              className="h-8 w-8 text-indigo-500" 
-                              title="Record Payment"
-                              disabled={!subscriptionActive}
-                              onClick={() => {
-                                if (guardEditAction()) return;
-                                setSelectedTripForPayment(trip);
-                                setIsPaymentModalOpen(true);
-                              }}
-                            >
-                              <Wallet className="w-4 h-4" />
-                            </Button>
-
-                            <Link href={`/lr-receipt-preview?id=${trip.id}`}>
-                              <Button size="icon" variant="ghost" className="h-8 w-8 text-green-500" title="View LR">
-                                <FileText className="w-4 h-4" />
-                              </Button>
-                            </Link>
-                            
-                            {trip.billed && trip.invoiceId && (
-                              <Link href={`/invoice-preview?id=${trip.invoiceId}`}>
-                                <Button size="icon" variant="ghost" className="h-8 w-8 text-accent" title="View Bill">
-                                  <Receipt className="w-4 h-4" />
-                                </Button>
-                              </Link>
-                            )}
-
-                            <Button size="icon" variant="ghost" onClick={() => handleEditTrip(trip)} disabled={!subscriptionActive} className="h-8 w-8 text-blue-500" title={!subscriptionActive ? subscriptionBlockMessage : "Edit"}>
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            {!trip.billed && (
-                              <Button size="icon" variant="ghost" onClick={() => setTripToDelete(trip)} disabled={!subscriptionActive} className="h-8 w-8 text-destructive" title={!subscriptionActive ? subscriptionBlockMessage : "Delete"}>
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
+                        <TableCell className="text-right">{renderTripDesktopActions(trip)}</TableCell>
                       </TableRow>
                     );
                   })}
                 </TableBody>
               </Table>
-            </div>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

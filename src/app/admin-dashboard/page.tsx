@@ -25,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { MobileDataCard, MobileDataCards, MobileDataField } from "@/components/ui/mobile-data-card";
 import { Textarea } from "@/components/ui/textarea";
 import {
   DropdownMenu,
@@ -777,7 +778,133 @@ export default function AdminDashboardPage() {
             </div>
           ) : (
             <>
-              <div className="w-full">
+              <div className="p-4 md:hidden">
+                <MobileDataCards className="space-y-4">
+                  {paginatedTransporters.map((transporter) => {
+                    const status = getAccountStatus(transporter);
+                    const displayStatus = isPlanExpired(transporter) ? "expired" : status;
+                    const plan = getTransporterPlan(transporter);
+                    const paymentStatus = getPaymentStatus(transporter);
+                    const transporterTrips = getTransporterTrips(transporter);
+                    const isSaving = savingId === transporter.id;
+
+                    return (
+                      <MobileDataCard
+                        key={transporter.id}
+                        title={transporter.companyName || "Unnamed Company"}
+                        titleClassName="text-primary"
+                        subtitle={`Owner: ${transporter.ownerName || "N/A"}`}
+                        badge={(
+                          <Badge variant="outline" className={cn("capitalize text-[11px]", STATUS_STYLES[displayStatus])}>
+                            {displayStatus}
+                          </Badge>
+                        )}
+                        headerRight={(
+                          <Badge variant="outline" className={cn("capitalize text-[11px]", PAYMENT_STYLES[paymentStatus])}>
+                            {paymentStatus}
+                          </Badge>
+                        )}
+                        actions={(
+                          <>
+                            <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={() => handleOpenDialog(transporter, "details")}>
+                              Details
+                            </Button>
+                            <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={() => handleOpenDialog(transporter, "trips")}>
+                              Trips
+                            </Button>
+                            <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={() => handleOpenDialog(transporter, "bills")}>
+                              Bills
+                            </Button>
+                            <Button size="sm" variant="outline" className="flex-1 sm:flex-none" onClick={() => handleOpenDialog(transporter, "notes")}>
+                              Notes
+                            </Button>
+                            {status === "pending" ? (
+                              <Button size="sm" className="flex-1 sm:flex-none" disabled={isSaving} onClick={() => handleApprove(transporter)}>
+                                Approve
+                              </Button>
+                            ) : null}
+                            {status !== "suspended" ? (
+                              <Button size="sm" variant="destructive" className="flex-1 sm:flex-none" disabled={isSaving} onClick={() => handleUpdateTransporter(transporter.id, { accountStatus: "suspended" }, "Transporter Suspended")}>
+                                Suspend
+                              </Button>
+                            ) : (
+                              <Button size="sm" variant="outline" className="flex-1 sm:flex-none" disabled={isSaving} onClick={() => handleUpdateTransporter(transporter.id, { accountStatus: "active" }, "Transporter Reactivated")}>
+                                Reactivate
+                              </Button>
+                            )}
+                            <Button size="sm" variant="outline" className="flex-1 sm:flex-none" disabled={isSaving} onClick={() => handleUpdateTransporter(transporter.id, { paymentStatus: "paid" }, "Payment Marked Received")}>
+                              Mark Paid
+                            </Button>
+                          </>
+                        )}
+                      >
+                        <MobileDataField label="Email" value={transporter.email} className="sm:col-span-2" />
+                        <MobileDataField label="Mobile" value={transporter.mobile} />
+                        <MobileDataField label="Trips" value={String(transporterTrips.length)} />
+                        <MobileDataField
+                          label="Plan"
+                          value={(
+                            <Select value={plan} onValueChange={(value: TransporterPlan) => handleChangePlan(transporter, value)}>
+                              <SelectTrigger className="h-9 bg-secondary/30 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {ADMIN_PLAN_OPTIONS.map((planOption) => (
+                                  <SelectItem key={planOption} value={planOption}>{PLAN_LABELS[planOption]}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        />
+                        <MobileDataField
+                          label="Expiry"
+                          value={(
+                            <div className="space-y-2">
+                              <Input
+                                type="date"
+                                value={expiryEdits[transporter.id] ?? formatDateInputValue(transporter.planExpiryDate)}
+                                onChange={(event) => setExpiryEdits((current) => ({ ...current, [transporter.id]: event.target.value }))}
+                                className="h-9 bg-secondary/30 text-xs px-2"
+                              />
+                              <Button size="sm" variant="outline" onClick={() => handleExtendExpiry(transporter)} disabled={isSaving} className="h-8 w-full text-xs px-2">
+                                Extend
+                              </Button>
+                            </div>
+                          )}
+                        />
+                        <MobileDataField
+                          label="Account"
+                          value={(
+                            <Select value={status} onValueChange={(value: AccountStatus) => handleUpdateTransporter(transporter.id, { accountStatus: value }, "Account Status Updated")}>
+                              <SelectTrigger className="h-9 bg-secondary/30 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {ACCOUNT_STATUSES.map((statusOption) => <SelectItem key={statusOption} value={statusOption}>{statusOption}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        />
+                        <MobileDataField
+                          label="Payment"
+                          value={(
+                            <Select value={paymentStatus} onValueChange={(value: PaymentStatus) => handleUpdateTransporter(transporter.id, { paymentStatus: value }, "Payment Status Updated")}>
+                              <SelectTrigger className="h-9 bg-secondary/30 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {PAYMENT_STATUSES.map((statusOption) => <SelectItem key={statusOption} value={statusOption}>{statusOption}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        />
+                      </MobileDataCard>
+                    );
+                  })}
+                </MobileDataCards>
+              </div>
+
+              <div className="hidden md:block w-full">
                 <Table className="table-fixed text-xs">
                   <TableHeader className="bg-secondary/30">
                     <TableRow>
@@ -1042,21 +1169,41 @@ function AdminRowsTable({ headers, rows, emptyText }: { headers: string[]; rows:
   }
 
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            {headers.map((header) => <TableHead key={header}>{header}</TableHead>)}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((row, index) => (
-            <TableRow key={index}>
-              {row.map((cell, cellIndex) => <TableCell key={cellIndex}>{String(cell || "N/A")}</TableCell>)}
+    <>
+      <MobileDataCards>
+        {rows.map((row, index) => (
+          <MobileDataCard
+            key={index}
+            title={String(row[0] || "N/A")}
+            subtitle={headers[1] ? `${headers[1]}: ${String(row[1] || "N/A")}` : undefined}
+          >
+            {row.slice(1).map((cell, cellIndex) => (
+              <MobileDataField
+                key={cellIndex}
+                label={headers[cellIndex + 1]}
+                value={String(cell || "N/A")}
+              />
+            ))}
+          </MobileDataCard>
+        ))}
+      </MobileDataCards>
+
+      <div className="hidden md:block overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {headers.map((header) => <TableHead key={header}>{header}</TableHead>)}
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+          </TableHeader>
+          <TableBody>
+            {rows.map((row, index) => (
+              <TableRow key={index}>
+                {row.map((cell, cellIndex) => <TableCell key={cellIndex}>{String(cell || "N/A")}</TableCell>)}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </>
   );
 }

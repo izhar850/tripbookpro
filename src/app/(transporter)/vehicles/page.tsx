@@ -17,6 +17,7 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { MobileDataCard, MobileDataCards, MobileDataField } from "@/components/ui/mobile-data-card";
 import {
   isValidDateInput,
   nextSortDirection,
@@ -31,6 +32,8 @@ import { subscribeToOwnedCollection } from "@/lib/firestore-query-utils";
 type VehicleSortKey = "createdAt" | "vehicleNo" | "type" | "status";
 
 const VEHICLE_TYPE_OPTIONS = ["single axle", "multi axle"];
+const getVehicleStatusBadgeClass = (status: string) =>
+  status === "active" ? "bg-green-500/10 text-green-500 border-green-500/20" : "";
 
 export default function VehiclesPage() {
   const { profile } = useAuth();
@@ -216,6 +219,26 @@ export default function VehiclesPage() {
     status: (vehicle) => vehicle.status,
   }), [filteredVehicles, vehicleSort]);
 
+  const openEditVehicle = (vehicle: any) => {
+    setEditingVehicle(vehicle);
+    setFormData({
+      vehicleNo: normalizeVehicleNo(vehicle.vehicleNo),
+      type: vehicle.type,
+      ownerName: vehicle.ownerName,
+      capacity: vehicle.capacity,
+      rcExpiry: vehicle.rcExpiry || "",
+      insuranceExpiry: vehicle.insuranceExpiry || "",
+      permitExpiry: vehicle.permitExpiry || "",
+      fitnessExpiry: vehicle.fitnessExpiry || "",
+      pollutionExpiry: vehicle.pollutionExpiry || "",
+      sizeL: vehicle.sizeL || "",
+      sizeW: vehicle.sizeW || "",
+      sizeH: vehicle.sizeH || "",
+      status: vehicle.status || "active"
+    });
+    setIsDialogOpen(true);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -341,71 +364,100 @@ export default function VehiclesPage() {
               <p className="text-sm">Click "Add New Vehicle" to build your fleet.</p>
             </div>
           ) : (
-            <div className="rounded-md border border-border/50 overflow-hidden">
-              <Table>
-                <TableHeader className="bg-secondary/50">
-                  <TableRow>
-                    <SortableTableHead active={vehicleSort.key === "vehicleNo"} direction={vehicleSort.direction} onSort={() => handleVehicleSort("vehicleNo")}>Vehicle No</SortableTableHead>
-                    <SortableTableHead active={vehicleSort.key === "type"} direction={vehicleSort.direction} onSort={() => handleVehicleSort("type")}>Type & Capacity</SortableTableHead>
-                    <TableHead className="font-bold">Owner</TableHead>
-                    <SortableTableHead active={vehicleSort.key === "status"} direction={vehicleSort.direction} onSort={() => handleVehicleSort("status")} align="center">Status</SortableTableHead>
-                    <TableHead className="font-bold text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedVehicles.map((vehicle) => (
-                    <TableRow key={vehicle.id} className="hover:bg-secondary/30 transition-colors">
-                      <TableCell className="font-bold text-primary">
-                        <div className="flex flex-col">
-                          <span>{normalizeVehicleNo(vehicle.vehicleNo)}</span>
-                          <span className="text-[10px] text-muted-foreground font-normal uppercase">Next Expiry: {vehicle.rcExpiry || "N/A"}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        <div className="flex flex-col">
-                          <span>{vehicle.type}</span>
-                          <span className="text-xs text-muted-foreground">{vehicle.capacity} Tons</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm">{vehicle.ownerName}</TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant={vehicle.status === "active" ? "default" : "secondary"} className={vehicle.status === "active" ? "bg-green-500/10 text-green-500 border-green-500/20" : ""}>
-                          {vehicle.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button size="icon" variant="ghost" className="text-blue-500" disabled={!subscriptionActive} title={!subscriptionActive ? subscriptionBlockMessage : "Edit"} onClick={() => { 
-                            setEditingVehicle(vehicle); 
-                            setFormData({ 
-                              vehicleNo: normalizeVehicleNo(vehicle.vehicleNo), 
-                              type: vehicle.type, 
-                              ownerName: vehicle.ownerName, 
-                              capacity: vehicle.capacity,
-                              rcExpiry: vehicle.rcExpiry || "",
-                              insuranceExpiry: vehicle.insuranceExpiry || "",
-                              permitExpiry: vehicle.permitExpiry || "",
-                              fitnessExpiry: vehicle.fitnessExpiry || "",
-                              pollutionExpiry: vehicle.pollutionExpiry || "",
-                              sizeL: vehicle.sizeL || "",
-                              sizeW: vehicle.sizeW || "",
-                              sizeH: vehicle.sizeH || "",
-                              status: vehicle.status || "active"
-                            }); 
-                            setIsDialogOpen(true); 
-                          }}>
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="text-destructive" disabled={!subscriptionActive} title={!subscriptionActive ? subscriptionBlockMessage : "Delete"} onClick={() => handleDelete(vehicle.id)}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+            <>
+              <MobileDataCards>
+                {sortedVehicles.map((vehicle) => (
+                  <MobileDataCard
+                    key={vehicle.id}
+                    title={normalizeVehicleNo(vehicle.vehicleNo) || "Vehicle"}
+                    titleClassName="text-primary"
+                    subtitle={vehicle.ownerName || "Owner not added"}
+                    badge={(
+                      <Badge variant={vehicle.status === "active" ? "default" : "secondary"} className={getVehicleStatusBadgeClass(vehicle.status)}>
+                        {vehicle.status || "inactive"}
+                      </Badge>
+                    )}
+                    actions={(
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 sm:flex-none"
+                          disabled={!subscriptionActive}
+                          title={!subscriptionActive ? subscriptionBlockMessage : "Edit"}
+                          onClick={() => openEditVehicle(vehicle)}
+                        >
+                          <Edit className="mr-2 h-4 w-4 text-blue-500" /> Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 sm:flex-none"
+                          disabled={!subscriptionActive}
+                          title={!subscriptionActive ? subscriptionBlockMessage : "Delete"}
+                          onClick={() => handleDelete(vehicle.id)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4 text-destructive" /> Delete
+                        </Button>
+                      </>
+                    )}
+                  >
+                    <MobileDataField label="Type" value={vehicle.type} />
+                    <MobileDataField label="Capacity" value={vehicle.capacity ? `${vehicle.capacity} Tons` : undefined} />
+                    <MobileDataField label="RC Expiry" value={vehicle.rcExpiry} />
+                    <MobileDataField label="Insurance" value={vehicle.insuranceExpiry} />
+                  </MobileDataCard>
+                ))}
+              </MobileDataCards>
+
+              <div className="hidden md:block rounded-md border border-border/50 overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-secondary/50">
+                    <TableRow>
+                      <SortableTableHead active={vehicleSort.key === "vehicleNo"} direction={vehicleSort.direction} onSort={() => handleVehicleSort("vehicleNo")}>Vehicle No</SortableTableHead>
+                      <SortableTableHead active={vehicleSort.key === "type"} direction={vehicleSort.direction} onSort={() => handleVehicleSort("type")}>Type & Capacity</SortableTableHead>
+                      <TableHead className="font-bold">Owner</TableHead>
+                      <SortableTableHead active={vehicleSort.key === "status"} direction={vehicleSort.direction} onSort={() => handleVehicleSort("status")} align="center">Status</SortableTableHead>
+                      <TableHead className="font-bold text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedVehicles.map((vehicle) => (
+                      <TableRow key={vehicle.id} className="hover:bg-secondary/30 transition-colors">
+                        <TableCell className="font-bold text-primary">
+                          <div className="flex flex-col">
+                            <span>{normalizeVehicleNo(vehicle.vehicleNo)}</span>
+                            <span className="text-[10px] text-muted-foreground font-normal uppercase">Next Expiry: {vehicle.rcExpiry || "N/A"}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          <div className="flex flex-col">
+                            <span>{vehicle.type}</span>
+                            <span className="text-xs text-muted-foreground">{vehicle.capacity} Tons</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm">{vehicle.ownerName}</TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant={vehicle.status === "active" ? "default" : "secondary"} className={getVehicleStatusBadgeClass(vehicle.status)}>
+                            {vehicle.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button size="icon" variant="ghost" className="text-blue-500" disabled={!subscriptionActive} title={!subscriptionActive ? subscriptionBlockMessage : "Edit"} onClick={() => openEditVehicle(vehicle)}>
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button size="icon" variant="ghost" className="text-destructive" disabled={!subscriptionActive} title={!subscriptionActive ? subscriptionBlockMessage : "Delete"} onClick={() => handleDelete(vehicle.id)}>
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

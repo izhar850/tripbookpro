@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { MobileDataCard, MobileDataCards, MobileDataField } from "@/components/ui/mobile-data-card";
 import { useToast } from "@/hooks/use-toast";
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
@@ -38,6 +39,10 @@ const PARTY_TYPE_OPTIONS = [
 
 const getPartyType = (party: any) => party?.partyType === "consignor" ? "consignor" : "consignee";
 const getPartyTypeLabel = (party: any) => getPartyType(party) === "consignor" ? "Consignor" : "Consignee";
+const getPartyTypeBadgeClass = (party: any) =>
+  getPartyType(party) === "consignor"
+    ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
+    : "bg-green-500/10 text-green-500 border-green-500/20";
 
 export default function PartiesPage() {
   const { profile } = useAuth();
@@ -57,6 +62,11 @@ export default function PartiesPage() {
   });
   const subscriptionActive = isSubscriptionActive(profile);
   const subscriptionBlockMessage = getSubscriptionBlockMessage(profile);
+
+  const resetForm = () => {
+    setEditingParty(null);
+    setFormData({ partyType: "consignee", partyName: "", gstNo: "", mobile: "", address: "" });
+  };
 
   const guardSubscriptionAction = () => {
     if (subscriptionActive) return false;
@@ -200,6 +210,18 @@ export default function PartiesPage() {
     mobile: (party) => party.mobile,
   }), [filteredParties, partySort]);
 
+  const openEditParty = (party: any) => {
+    setEditingParty(party);
+    setFormData({
+      partyType: getPartyType(party),
+      partyName: party.partyName || "",
+      gstNo: party.gstNo || "",
+      mobile: party.mobile || "",
+      address: party.address || "",
+    });
+    setIsDialogOpen(true);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -210,7 +232,7 @@ export default function PartiesPage() {
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button
-              onClick={() => { setEditingParty(null); setFormData({ partyType: "consignee", partyName: "", gstNo: "", mobile: "", address: "" }); }}
+              onClick={resetForm}
               disabled={!subscriptionActive}
               title={!subscriptionActive ? subscriptionBlockMessage : "Add New Party"}
               className="bg-gradient-primary h-11 px-6 font-bold"
@@ -289,46 +311,95 @@ export default function PartiesPage() {
               <p className="text-sm">Click "Add New Party" to get started.</p>
             </div>
           ) : (
-            <Table>
-              <TableHeader className="bg-secondary/50">
-                  <TableRow>
-                  <SortableTableHead active={partySort.key === "partyType"} direction={partySort.direction} onSort={() => handlePartySort("partyType")}>Party Type</SortableTableHead>
-                  <SortableTableHead active={partySort.key === "partyName"} direction={partySort.direction} onSort={() => handlePartySort("partyName")}>Party Name</SortableTableHead>
-                  <SortableTableHead active={partySort.key === "gstNo"} direction={partySort.direction} onSort={() => handlePartySort("gstNo")}>GST No</SortableTableHead>
-                  <SortableTableHead active={partySort.key === "mobile"} direction={partySort.direction} onSort={() => handlePartySort("mobile")}>Mobile</SortableTableHead>
-                  <TableHead className="font-bold">Address</TableHead>
-                  <TableHead className="font-bold text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <>
+              <MobileDataCards>
                 {sortedParties.map((party) => (
-                  <TableRow key={party.id} className="hover:bg-secondary/30 transition-colors">
-                    <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={getPartyType(party) === "consignor" ? "bg-blue-500/10 text-blue-500 border-blue-500/20" : "bg-green-500/10 text-green-500 border-green-500/20"}
-                      >
+                  <MobileDataCard
+                    key={party.id}
+                    title={party.partyName || "Unnamed Party"}
+                    titleClassName="text-primary"
+                    subtitle={party.mobile || "Mobile not added"}
+                    badge={(
+                      <Badge variant="outline" className={getPartyTypeBadgeClass(party)}>
                         {getPartyTypeLabel(party)}
                       </Badge>
-                    </TableCell>
-                    <TableCell className="font-bold text-primary">{party.partyName}</TableCell>
-                    <TableCell className="text-sm font-mono">{party.gstNo || "N/A"}</TableCell>
-                    <TableCell className="text-sm">{party.mobile || "N/A"}</TableCell>
-                    <TableCell className="text-xs max-w-[200px] truncate">{party.address || "N/A"}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button size="icon" variant="ghost" className="text-blue-500" disabled={!subscriptionActive} title={!subscriptionActive ? subscriptionBlockMessage : "Edit"} onClick={() => { setEditingParty(party); setFormData({ partyType: getPartyType(party), partyName: party.partyName || "", gstNo: party.gstNo || "", mobile: party.mobile || "", address: party.address || "" }); setIsDialogOpen(true); }}>
-                          <Edit className="w-4 h-4" />
+                    )}
+                    actions={(
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 sm:flex-none"
+                          disabled={!subscriptionActive}
+                          title={!subscriptionActive ? subscriptionBlockMessage : "Edit"}
+                          onClick={() => openEditParty(party)}
+                        >
+                          <Edit className="mr-2 h-4 w-4 text-blue-500" /> Edit
                         </Button>
-                        <Button size="icon" variant="ghost" className="text-destructive" disabled={!subscriptionActive} title={!subscriptionActive ? subscriptionBlockMessage : "Delete"} onClick={() => handleDelete(party.id)}>
-                          <Trash2 className="w-4 h-4" />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1 sm:flex-none"
+                          disabled={!subscriptionActive}
+                          title={!subscriptionActive ? subscriptionBlockMessage : "Delete"}
+                          onClick={() => handleDelete(party.id)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4 text-destructive" /> Delete
                         </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                      </>
+                    )}
+                  >
+                    <MobileDataField label="GST No" value={party.gstNo ? <span className="font-mono text-xs">{party.gstNo}</span> : undefined} />
+                    <MobileDataField label="Mobile" value={party.mobile} />
+                    <MobileDataField
+                      label="Address"
+                      value={party.address ? <span className="whitespace-pre-wrap">{party.address}</span> : undefined}
+                      className="sm:col-span-2"
+                    />
+                  </MobileDataCard>
                 ))}
-              </TableBody>
-            </Table>
+              </MobileDataCards>
+
+              <div className="hidden md:block">
+                <Table>
+                  <TableHeader className="bg-secondary/50">
+                    <TableRow>
+                      <SortableTableHead active={partySort.key === "partyType"} direction={partySort.direction} onSort={() => handlePartySort("partyType")}>Party Type</SortableTableHead>
+                      <SortableTableHead active={partySort.key === "partyName"} direction={partySort.direction} onSort={() => handlePartySort("partyName")}>Party Name</SortableTableHead>
+                      <SortableTableHead active={partySort.key === "gstNo"} direction={partySort.direction} onSort={() => handlePartySort("gstNo")}>GST No</SortableTableHead>
+                      <SortableTableHead active={partySort.key === "mobile"} direction={partySort.direction} onSort={() => handlePartySort("mobile")}>Mobile</SortableTableHead>
+                      <TableHead className="font-bold">Address</TableHead>
+                      <TableHead className="font-bold text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sortedParties.map((party) => (
+                      <TableRow key={party.id} className="hover:bg-secondary/30 transition-colors">
+                        <TableCell>
+                          <Badge variant="outline" className={getPartyTypeBadgeClass(party)}>
+                            {getPartyTypeLabel(party)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-bold text-primary">{party.partyName}</TableCell>
+                        <TableCell className="text-sm font-mono">{party.gstNo || "N/A"}</TableCell>
+                        <TableCell className="text-sm">{party.mobile || "N/A"}</TableCell>
+                        <TableCell className="text-xs max-w-[200px] truncate">{party.address || "N/A"}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button size="icon" variant="ghost" className="text-blue-500" disabled={!subscriptionActive} title={!subscriptionActive ? subscriptionBlockMessage : "Edit"} onClick={() => openEditParty(party)}>
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button size="icon" variant="ghost" className="text-destructive" disabled={!subscriptionActive} title={!subscriptionActive ? subscriptionBlockMessage : "Delete"} onClick={() => handleDelete(party.id)}>
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

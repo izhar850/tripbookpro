@@ -42,6 +42,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
 import { uploadTripFile, fetchTripFiles, deleteTripFile, type TripFile } from '@/firebase/storage/storage-service';
 import { Progress } from '@/components/ui/progress';
+import { MobileDataCard, MobileDataCards, MobileDataField } from '@/components/ui/mobile-data-card';
 import { normalizeVehicleNo } from '@/lib/transport-utils';
 import { getSubscriptionBlockMessage, isSubscriptionActive } from '@/lib/account-utils';
 
@@ -296,54 +297,99 @@ export function TripFilesModal({ trip, open, onOpenChange }: TripFilesModalProps
                 <p className="text-sm">No documents uploaded yet.</p>
               </div>
             ) : (
-              <div className="border rounded-xl overflow-hidden">
-                <Table>
-                  <TableHeader className="bg-secondary/50">
-                    <TableRow>
-                      <TableHead>Type</TableHead>
-                      <TableHead>File Name</TableHead>
-                      <TableHead>Uploaded</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {files.map((file) => (
-                      <TableRow key={file.id} className="hover:bg-secondary/30">
-                        <TableCell>
-                          <Badge variant={file.fileType === 'POD' ? 'default' : 'outline'} className="text-[10px]">
-                            {getFileTypeLabel(file.fileType)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-xs max-w-[150px] truncate" title={file.fileName}>
-                          {file.fileName}
-                        </TableCell>
-                        <TableCell className="text-[10px] text-muted-foreground">
-                          {file.uploadedAt?.toDate ? file.uploadedAt.toDate().toLocaleDateString() : new Date().toLocaleDateString()}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <a href={file.fileUrl} target="_blank" rel="noopener noreferrer">
-                              <Button size="icon" variant="ghost" className="h-8 w-8 text-indigo-500">
-                                <Eye className="w-4 h-4" />
-                              </Button>
-                            </a>
-                            <Button 
-                              size="icon" 
-                              variant="ghost" 
-                              className="h-8 w-8 text-destructive"
-                              disabled={!subscriptionActive}
-                              title={!subscriptionActive ? subscriptionBlockMessage : 'Delete'}
-                              onClick={() => handleDelete(file)}
-                            >
-                              <Trash2 className="w-4 h-4" />
+              <>
+                <MobileDataCards>
+                  {files.map((file) => (
+                    <MobileDataCard
+                      key={file.id}
+                      title={file.fileName}
+                      subtitle={file.notes || "No notes added"}
+                      badge={(
+                        <Badge variant={file.fileType === 'POD' ? 'default' : 'outline'} className="text-[10px]">
+                          {getFileTypeLabel(file.fileType)}
+                        </Badge>
+                      )}
+                      actions={(
+                        <>
+                          <a href={file.fileUrl} target="_blank" rel="noopener noreferrer" className="flex-1 sm:flex-none">
+                            <Button variant="outline" size="sm" className="w-full">
+                              <Eye className="mr-2 h-4 w-4 text-indigo-500" /> View File
                             </Button>
-                          </div>
-                        </TableCell>
+                          </a>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 sm:flex-none"
+                            disabled={!subscriptionActive}
+                            title={!subscriptionActive ? subscriptionBlockMessage : 'Delete'}
+                            onClick={() => handleDelete(file)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4 text-destructive" /> Delete
+                          </Button>
+                        </>
+                      )}
+                    >
+                      <MobileDataField
+                        label="Uploaded"
+                        value={file.uploadedAt?.toDate ? file.uploadedAt.toDate().toLocaleDateString() : new Date().toLocaleDateString()}
+                      />
+                      <MobileDataField
+                        label="Type"
+                        value={getFileTypeLabel(file.fileType)}
+                      />
+                    </MobileDataCard>
+                  ))}
+                </MobileDataCards>
+
+                <div className="hidden md:block border rounded-xl overflow-hidden">
+                  <Table>
+                    <TableHeader className="bg-secondary/50">
+                      <TableRow>
+                        <TableHead>Type</TableHead>
+                        <TableHead>File Name</TableHead>
+                        <TableHead>Uploaded</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableHeader>
+                    <TableBody>
+                      {files.map((file) => (
+                        <TableRow key={file.id} className="hover:bg-secondary/30">
+                          <TableCell>
+                            <Badge variant={file.fileType === 'POD' ? 'default' : 'outline'} className="text-[10px]">
+                              {getFileTypeLabel(file.fileType)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-xs max-w-[150px] truncate" title={file.fileName}>
+                            {file.fileName}
+                          </TableCell>
+                          <TableCell className="text-[10px] text-muted-foreground">
+                            {file.uploadedAt?.toDate ? file.uploadedAt.toDate().toLocaleDateString() : new Date().toLocaleDateString()}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <a href={file.fileUrl} target="_blank" rel="noopener noreferrer">
+                                <Button size="icon" variant="ghost" className="h-8 w-8 text-indigo-500">
+                                  <Eye className="w-4 h-4" />
+                                </Button>
+                              </a>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8 text-destructive"
+                                disabled={!subscriptionActive}
+                                title={!subscriptionActive ? subscriptionBlockMessage : 'Delete'}
+                                onClick={() => handleDelete(file)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
           </div>
         </div>

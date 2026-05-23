@@ -8,6 +8,7 @@ import { signOut } from "firebase/auth";
 import { 
   SidebarProvider, 
   Sidebar, 
+  SidebarClose,
   SidebarContent, 
   SidebarHeader, 
   SidebarFooter, 
@@ -106,15 +107,18 @@ function TransporterSidebar() {
 
   return (
     <Sidebar className="border-r border-border/50 bg-card">
-      <SidebarHeader className="p-6">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-gradient-primary rounded-lg flex items-center justify-center shadow-md">
-            <Truck className="text-white w-5 h-5" />
+      <SidebarHeader className="border-b border-sidebar-border/70 p-4 sm:p-6">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-gradient-primary rounded-lg flex items-center justify-center shadow-md">
+              <Truck className="text-white w-5 h-5" />
+            </div>
+            <div className="flex flex-col">
+              <span className="font-headline font-bold text-lg leading-tight">TripBook</span>
+              <span className="text-[10px] uppercase tracking-widest text-primary font-bold">Pro SaaS</span>
+            </div>
           </div>
-          <div className="flex flex-col">
-            <span className="font-headline font-bold text-lg leading-tight">TripBook</span>
-            <span className="text-[10px] uppercase tracking-widest text-primary font-bold">Pro SaaS</span>
-          </div>
+          <SidebarClose className="rounded-lg border border-sidebar-border/70 bg-sidebar-accent/40" />
         </div>
       </SidebarHeader>
       <SidebarContent className="px-3">
