@@ -13,6 +13,7 @@ import { Loader2, Truck } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { isValidMobile, normalizeGstNo, normalizeText } from "@/lib/transport-utils";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -138,6 +139,7 @@ export default function SignupPage() {
     >
       {/* Dark overlay without blur so the background is crisp */}
       <div className="absolute inset-0 bg-background/60 z-0"></div>
+      <ThemeToggle className="absolute right-4 top-4 z-20 bg-card/70 backdrop-blur-md" />
 
       <Card className="w-full max-w-lg bg-card/60 backdrop-blur-lg border-border/30 shadow-2xl relative z-10">
         <CardHeader className="text-center pb-2">

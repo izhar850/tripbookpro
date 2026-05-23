@@ -127,6 +127,12 @@ service cloud.firestore {
       allow update, delete: if isSuperAdmin() || (isActiveTransporter() && ownsCompany(resource.data));
     }
 
+    // Platform notices are created by super admins and visible to signed-in users.
+    match /platformNotices/{noticeId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isSuperAdmin();
+    }
+
     // Default Deny for all unknown collections
     match /{path=**} {
       allow read, write: if false;

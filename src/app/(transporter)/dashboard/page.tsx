@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { collection, query, where, doc, deleteDoc, runTransaction, serverTimestamp, or, and, addDoc, getDoc, getDocs } from "firebase/firestore";
+import { collection, query, where, doc, deleteDoc, runTransaction, serverTimestamp, or, and, addDoc, getDoc, getDocs, onSnapshot } from "firebase/firestore";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,6 +60,7 @@ import {
   SUBSCRIPTION_FEATURES,
   TRANSPORTER_PLANS,
   formatDateInputValue,
+  getDateFromFirestoreValue,
   getDaysRemaining,
   getPlanName,
   getSubscriptionBlockMessage,
@@ -83,6 +84,7 @@ export default function Dashboard() {
   const [trips, setTrips] = useState<any[]>([]);
   const [parties, setParties] = useState<any[]>([]);
   const [vehicles, setVehicles] = useState<any[]>([]);
+  const [platformNotices, setPlatformNotices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [editingTrip, setEditingTrip] = useState<any>(null);
@@ -210,6 +212,36 @@ export default function Dashboard() {
       unsubscribeParties();
       unsubscribeVehicles();
     };
+  }, [profile, db]);
+
+  useEffect(() => {
+    if (!profile || !db) return;
+
+    const unsubscribe = onSnapshot(
+      collection(db, "platformNotices"),
+      (snapshot) => {
+        const now = new Date();
+        const notices = snapshot.docs
+          .map((noticeDoc) => ({ id: noticeDoc.id, ...noticeDoc.data() }))
+          .filter((notice: any) => {
+            if (notice.active === false) return false;
+            const expiryDate = getDateFromFirestoreValue(notice.expiryDate);
+            return !expiryDate || expiryDate.getTime() >= now.getTime();
+          })
+          .sort((a: any, b: any) => {
+            const aTime = getDateFromFirestoreValue(a.createdAt)?.getTime() || 0;
+            const bTime = getDateFromFirestoreValue(b.createdAt)?.getTime() || 0;
+            return bTime - aTime;
+          });
+
+        setPlatformNotices(notices);
+      },
+      (serverError) => {
+        console.error("Platform Notices Query Error:", serverError);
+      }
+    );
+
+    return () => unsubscribe();
   }, [profile, db]);
 
   const stats = useMemo(() => {
@@ -1188,6 +1220,40 @@ export default function Dashboard() {
           </SheetContent>
         </Sheet>
       </div>
+
+      {platformNotices.length > 0 && (
+        <div className="space-y-3">
+          {platformNotices.map((notice) => (
+            <Card
+              key={notice.id}
+              className={cn(
+                "bg-card border-border/50",
+                notice.type === "warning" && "border-orange-500/30 bg-orange-500/10",
+                notice.type === "danger" && "border-destructive/30 bg-destructive/10",
+                notice.type === "success" && "border-green-500/30 bg-green-500/10",
+                notice.type === "info" && "border-primary/30 bg-primary/10"
+              )}
+            >
+              <CardContent className="p-4 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="font-headline text-lg font-bold">{notice.title}</h2>
+                    <Badge variant="outline" className="capitalize">
+                      {notice.type || "info"}
+                    </Badge>
+                  </div>
+                  {notice.message && <p className="text-sm text-muted-foreground">{notice.message}</p>}
+                </div>
+                {notice.expiryDate && (
+                  <p className="text-xs text-muted-foreground whitespace-nowrap">
+                    Till {formatDateInputValue(notice.expiryDate)}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       <Card
         className={cn(

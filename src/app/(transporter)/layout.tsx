@@ -24,6 +24,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { getTransporterAccessIssue } from "@/lib/account-utils";
 import { useToast } from "@/hooks/use-toast";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 function MobileHeader() {
   const { toggleSidebar } = useSidebar();
@@ -36,9 +37,12 @@ function MobileHeader() {
         </div>
         <span className="font-headline font-bold text-sm tracking-tight">TripBook Pro</span>
       </div>
-      <Button size="icon" variant="ghost" className="h-9 w-9" onClick={toggleSidebar}>
-        <Menu className="h-5 w-5" />
-      </Button>
+      <div className="flex items-center gap-2">
+        <ThemeToggle className="h-9 px-3" />
+        <Button size="icon" variant="ghost" className="h-9 w-9" onClick={toggleSidebar}>
+          <Menu className="h-5 w-5" />
+        </Button>
+      </div>
     </header>
   );
 }
@@ -126,6 +130,7 @@ function TransporterSidebar() {
             <span className="text-[10px] text-muted-foreground truncate">{profile?.email}</span>
           </div>
         </div>
+        <ThemeToggle className="w-full justify-center mb-3" />
         <button
           onClick={handleLogout}
           className="w-full h-10 flex items-center gap-3 px-4 rounded-lg text-destructive hover:bg-destructive/10 transition-colors"

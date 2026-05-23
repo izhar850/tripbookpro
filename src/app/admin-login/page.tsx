@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, ShieldCheck } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -55,6 +56,7 @@ export default function AdminLoginPage() {
       style={{ backgroundImage: "url(/images/bg-transport.png)" }}
     >
       <div className="absolute inset-0 bg-background/70 z-0" />
+      <ThemeToggle className="absolute right-4 top-4 z-20 bg-card/70 backdrop-blur-md" />
 
       <Card className="w-full max-w-md bg-card/70 backdrop-blur-lg border-border/30 shadow-2xl relative z-10">
         <CardHeader className="text-center pb-2">
