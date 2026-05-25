@@ -90,8 +90,6 @@ function LRReceiptContent() {
   const totalFreight = Number(trip.totalFreight || 0);
   const advance = Number(trip.advance || 0);
   const balance = Number(trip.balance || 0);
-  const vehicleSizeParts = [trip.sizeL, trip.sizeW, trip.sizeH].map((value) => displayValue(value));
-  const vehicleSize = vehicleSizeParts.some(Boolean) ? vehicleSizeParts.join(" / ") : "";
   const amountWords = totalAmount > 0 ? `${numberToWords(totalAmount)} Rupees Only` : "";
   const gstPayBy = String(trip.gstPayBy || "").toLowerCase();
 
@@ -176,22 +174,20 @@ function LRReceiptContent() {
               <td className="p-2">{displayValue(trip.vehicleType)}</td>
             </tr>
             <tr>
-              <th className="bg-slate-100 p-2 text-left font-black">Size L/W/H</th>
-              <td className="p-2">{vehicleSize}</td>
               <th className="bg-slate-100 p-2 text-left font-black">Rate / Qtl</th>
               <td className="p-2">{formatMoney(trip.rateQtl)}</td>
-            </tr>
-            <tr>
               <th className="bg-slate-100 p-2 text-left font-black">Total Freight</th>
               <td className="p-2">{formatMoney(totalFreight)}</td>
-              <th className="bg-slate-100 p-2 text-left font-black">Advance</th>
-              <td className="p-2">{formatMoney(advance)}</td>
             </tr>
             <tr>
+              <th className="bg-slate-100 p-2 text-left font-black">Advance</th>
+              <td className="p-2">{formatMoney(advance)}</td>
               <th className="bg-slate-100 p-2 text-left font-black">Balance</th>
               <td className="p-2">{formatMoney(balance)}</td>
+            </tr>
+            <tr>
               <th className="bg-slate-100 p-2 text-left font-black">Remark</th>
-              <td className="p-2">{displayValue(trip.remark || trip.notes)}</td>
+              <td colSpan={3} className="p-2">{displayValue(trip.remark || trip.notes)}</td>
             </tr>
           </tbody>
         </table>

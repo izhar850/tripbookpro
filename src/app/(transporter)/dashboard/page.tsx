@@ -148,9 +148,6 @@ export default function Dashboard() {
     packages: "",
     weight: "",
     goodsDescription: "",
-    sizeL: "",
-    sizeW: "",
-    sizeH: "",
     source: "",
     destination: "",
     rateQtl: "",
@@ -430,9 +427,6 @@ export default function Dashboard() {
     packages: normalizeText(formData.packages),
     weight: normalizeText(formData.weight),
     goodsDescription: normalizeText(formData.goodsDescription),
-    sizeL: normalizeText(formData.sizeL),
-    sizeW: normalizeText(formData.sizeW),
-    sizeH: normalizeText(formData.sizeH),
     source: normalizeText(formData.source),
     destination: normalizeText(formData.destination),
     rateQtl: normalizeText(formData.rateQtl),
@@ -581,9 +575,6 @@ export default function Dashboard() {
         vehicleId: vehicleRef.id,
         vehicleNo: vehicleData.vehicleNo,
         vehicleType: vehicleData.type,
-        sizeL: vehicleData.sizeL,
-        sizeW: vehicleData.sizeW,
-        sizeH: vehicleData.sizeH,
       }));
       resetQuickVehicleData();
       setIsQuickVehicleOpen(false);
@@ -799,9 +790,6 @@ export default function Dashboard() {
       packages: "",
       weight: "",
       goodsDescription: "",
-      sizeL: "",
-      sizeW: "",
-      sizeH: "",
       source: "",
       destination: "",
       rateQtl: "",
@@ -846,9 +834,6 @@ export default function Dashboard() {
       packages: (trip.packages || 0).toString(),
       weight: (trip.weight || 0).toString(),
       goodsDescription: trip.goodsDescription,
-      sizeL: trip.sizeL || "",
-      sizeW: trip.sizeW || "",
-      sizeH: trip.sizeH || "",
       source: trip.source,
       destination: trip.destination,
       rateQtl: (trip.rateQtl || 0).toString(),
@@ -1208,9 +1193,6 @@ export default function Dashboard() {
                         vehicleId: val, 
                         vehicleNo: normalizeVehicleNo(v.vehicleNo), 
                         vehicleType: normalizeText(v.type),
-                        sizeL: v.sizeL || "",
-                        sizeW: v.sizeW || "",
-                        sizeH: v.sizeH || "",
                       });
                     }
                   }}
@@ -1243,21 +1225,6 @@ export default function Dashboard() {
               </div>
 
               {/* Driver selection removed from the active trip workflow; legacy Firestore driver fields are left untouched. */}
-
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>Length (ft)</Label>
-                  <Input type="number" placeholder="L" value={formData.sizeL} onChange={e => setFormData({ ...formData, sizeL: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Width (ft)</Label>
-                  <Input type="number" placeholder="W" value={formData.sizeW} onChange={e => setFormData({ ...formData, sizeW: e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Height (ft)</Label>
-                  <Input type="number" placeholder="H" value={formData.sizeH} onChange={e => setFormData({ ...formData, sizeH: e.target.value })} />
-                </div>
-              </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
